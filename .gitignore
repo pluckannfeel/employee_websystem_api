@@ -1,0 +1,6 @@
+.env
+
+docker-compose.yml
+DockerFile
+DockerFile.pgadmin
+Pipfile.lock
