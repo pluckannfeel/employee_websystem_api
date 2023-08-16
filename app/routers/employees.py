@@ -2,6 +2,7 @@ from datetime import datetime
 import shutil
 import os
 import time
+import json
 
 from typing import List, Type
 from dotenv import load_dotenv
@@ -21,7 +22,7 @@ from app.models.employee_qualifications import Emp_Qualification, emp_qualificat
 from app.models.employee_schema import CreateEmployee, CreateEmployeeImmigrationDetails, CreateEmployeeRelatives, CreateEmployeeSchoolWorkHistory, CreateEmployeeQualifications
 
 # fastapi
-from fastapi import APIRouter, Depends, status, Request, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, status, Request, HTTPException, File, Form, UploadFile
 
 # authentication
 from app.auth.authentication import hash_password, token_generator, verify_password, verify_token_email
@@ -69,31 +70,42 @@ async def get_employee_details(employee: str):
     return {'data': {}, 'msg':  'No employee detais found'}
 
 
-@router.post("/create_employee", status_code=status.HTTP_201_CREATED)
-async def create_employee(employee: CreateEmployee, image: UploadFile = File(...)) -> dict:
+@router.post("/add_employee", status_code=status.HTTP_201_CREATED)
+async def create_employee(employee_json: str = Form(...), employee_image: UploadFile = File(...)):
     # start_time = time.time()
 
-    emp_info = employee.dict(exclude_unset=True)
+    # emp_info = employee.dict(exclude_unset=True)
+    
+    # employee_json = json.loads(employee_data)
+    
+    # print(employee_img)
+    employee_data = json.loads(employee_json)
+        
+    # image = employee_image.read()
+    
+    print(employee_image.filename)
+    
+    return {"employee_details": employee_data, "employee_img": employee_image.filename}
 
-    print(f"email: {emp_info['user_email']}")
+    # print(f"email: {emp_info['user_email']}")
 
-    user = await User.get(email=emp_info['user_email']).values('id')
+    # user = await User.get(email=emp_info['user_email']).values('id')
 
-    # add user id to emp info
-    emp_info['user_id'] = user['id']
-    # remove user email from emp info
-    emp_info.pop('user_email')
+    # # add user id to emp info
+    # emp_info['user_id'] = user['id']
+    # # remove user email from emp info
+    # emp_info.pop('user_email')
 
-    print(f"emp_info: {emp_info}")
+    # print(f"emp_info: {emp_info}")
 
-    # create employee
-    emp_data = await Employee.create(**emp_info)
+    # # create employee
+    # emp_data = await Employee.create(**emp_info)
 
-    new_employee = await employee_pydantic.from_tortoise_orm(emp_data)
+    # new_employee = await employee_pydantic.from_tortoise_orm(emp_data)
 
-    # print("Time taken: ", time.time() - start_time)
+    # # print("Time taken: ", time.time() - start_time)
 
-    return {'data': new_employee, 'msg':  'Employee created successfully'}
+    # return {'data': new_employee, 'msg':  'Employee created successfully'}
 
 # @router.post("/add_change_employee_image", status_code=status.HTTP_201_CREATED)
 # async def add_change_employee_image(employee_id: str, image: UploadFile = File(...)):
