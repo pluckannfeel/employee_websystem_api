@@ -30,6 +30,11 @@ from app.auth.authentication import hash_password, token_generator, verify_passw
 # email verification
 from app.auth.email_verification import send_email
 
+from app.helpers.s3_file_upload import upload_image_to_s3, generate_s3_url
+
+# s3_upload_path = os.environ['AWS_PPS_STORAGE_URL'] + 'uploads/employees/img/'
+s3_upload_folder = 'uploads/employees/img/'
+
 router = APIRouter(
     prefix="/employees",
     tags=["Employees"],
@@ -72,34 +77,66 @@ async def get_employee_details(employee: str):
 
 @router.post("/add_employee", status_code=status.HTTP_201_CREATED)
 async def create_employee(employee_json: str = Form(...), employee_image: UploadFile = File(...)):
-    # start_time = time.time()
-
     # emp_info = employee.dict(exclude_unset=True)
-    
-    # employee_json = json.loads(employee_data)
-    
-    # print(employee_img)
+
     employee_data = json.loads(employee_json)
-        
+
     # image = employee_image.read()
+
+    is_file_image = employee_image.content_type.startswith('image')
+
+    if not is_file_image:
+        raise HTTPException(status_code=400, detail="File is not an image")
+
+    now = datetime.now()
+    image_name = employee_data['name_romaji'].split(
+        ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + employee_image.filename.split('.')[-1]
+
+    # s3_img_url = s3_upload_path + image_name
+    s3_img_path = s3_upload_folder + image_name
+
+    # upload to s3 bucket
+    uploaded_file = upload_image_to_s3(employee_image, image_name)
+
+    print("uploaded: ", uploaded_file)
+
+    # generate url with the image name
+    s3_read_url = generate_s3_url(s3_img_path, 'read')
     
-    print(employee_image.filename)
+    # append s3_read_url to employee_data
+    employee_data['img_url'] = s3_read_url
+
+    print("s3_read_url: ", s3_read_url)
+
+    # confirm and get the user id
+    user = await User.get(id=employee_data['user_id']).values('id')
+
+    # make a json object called specified_skills_object that contains the specified skills above
+    employee_data['specified_skills_object'] = [
+        {
+            'id': 1,
+            'specified_skills_period_from': employee_data['specified_skills_object_1_from'],
+            'specified_skills_period_to': employee_data['specified_skills_object_1_to']
+        },
+        {
+            'id': 2,
+            'specified_skills_period_from': employee_data['specified_skills_object_2_from'],
+            'specified_skills_period_to': employee_data['specified_skills_object_2_to']
+        }]
     
-    return {"employee_details": employee_data, "employee_img": employee_image.filename}
-
-    # print(f"email: {emp_info['user_email']}")
-
-    # user = await User.get(email=emp_info['user_email']).values('id')
-
-    # # add user id to emp info
-    # emp_info['user_id'] = user['id']
-    # # remove user email from emp info
-    # emp_info.pop('user_email')
-
-    # print(f"emp_info: {emp_info}")
+    del employee_data['specified_skills_object_1_from']
+    del employee_data['specified_skills_object_1_to']
+    del employee_data['specified_skills_object_2_from']
+    del employee_data['specified_skills_object_2_to']
 
     # # create employee
-    # emp_data = await Employee.create(**emp_info)
+    emp_data = await Employee.create(**employee_data)
+    
+    new_employee = await employee_pydantic.from_tortoise_orm(emp_data)
+
+    return new_employee
+
+    
 
     # new_employee = await employee_pydantic.from_tortoise_orm(emp_data)
 
@@ -110,11 +147,11 @@ async def create_employee(employee_json: str = Form(...), employee_image: Upload
 # @router.post("/add_change_employee_image", status_code=status.HTTP_201_CREATED)
 # async def add_change_employee_image(employee_id: str, image: UploadFile = File(...)):
 #     employee = await Employee.get(id=employee_id).values('id','name_romaji')
-    
+
 #     # to avoid file name duplicates, lets concatenate datetime and user's name
 #     now = datetime.now()
 #     new_image_name = employee['name_romaji'].split('@')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + image.filename.split('.')[-1]
-    
+
 #     return ''
 
 

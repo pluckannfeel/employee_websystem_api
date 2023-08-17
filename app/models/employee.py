@@ -10,6 +10,7 @@ class Employee(Model):
     name_romaji = fields.CharField(max_length=256, null=False)
     name_kanji = fields.CharField(max_length=128, null=True)
     name_kana = fields.CharField(max_length=256, null=False)
+    img_url = fields.CharField(max_length=500, null=True)
     nationality = fields.CharField(max_length=128, null=True)
     gender = fields.CharField(max_length=128, null=True)
     age = fields.IntField(null=True)

@@ -23,43 +23,43 @@ class GetEmployeeDetails(BaseModel):
 
 class CreateEmployee(BaseModel):
     user_id: str  # get the id of the user from the email
-    # name_romaji: str
-    # name_kanji: str
-    # name_kana: str
-    # nationality: str
-    # gender: str
-    # age: int
-    # birth_date: date
-    # birth_place: str
-    # present_address: str
-    # postal_code: str
-    # home_address: str
-    # email: EmailStr
-    # contact_number: str
-    # has_spouse: bool
-    # primary_language: str
-    # start_date: date
-    # role: str
-    # company_name: str
-    # work_area_section: str
-    # company_address: str
-    # work_conditions_master: str
-    # work_conditions_japanese: str
-    # reg_support_manager: str
-    # reg_support_staff: str
-    # affiliated_support_manager: str
-    # affiliated_support_staff: str
-    # intermediary_name: str
-    # intermediary_address: str
-    # intermediary_agency_name: str
-    # intermediary_contact_number: str
-    # enrollment_status: str
-    # return_date: date
-    # specified_skills_object: str
-    # foreigner_skills_category: str
-    # foreigner_skills_category_status: bool
-    # status_of_residence: str
-    # memo: str
+    name_romaji: str
+    name_kanji: str
+    name_kana: str
+    nationality: str
+    gender: str
+    age: int
+    birth_date: date
+    birth_place: str
+    present_address: str
+    postal_code: str
+    home_address: str
+    email: EmailStr
+    contact_number: str
+    has_spouse: bool
+    primary_language: str
+    start_date: date
+    role: str
+    company_name: str
+    work_area_section: str
+    company_address: str
+    work_conditions_master: str
+    work_conditions_japanese: str
+    reg_support_manager: str
+    reg_support_staff: str
+    affiliated_support_manager: str
+    affiliated_support_staff: str
+    intermediary_name: str
+    intermediary_address: str
+    intermediary_agency_name: str
+    intermediary_contact_number: str
+    enrollment_status: str
+    return_date: date
+    specified_skills_object: str
+    foreigner_skills_category: str
+    foreigner_skills_category_status: bool
+    status_of_residence: str
+    memo: str
     # display_order: int
 
     # class Config:
