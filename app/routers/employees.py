@@ -81,6 +81,7 @@ async def create_employee(employee_json: str = Form(...), employee_image: Upload
 
     employee_data = json.loads(employee_json)
 
+
     # image = employee_image.read()
 
     is_file_image = employee_image.content_type.startswith('image')

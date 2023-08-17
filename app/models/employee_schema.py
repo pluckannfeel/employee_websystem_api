@@ -36,7 +36,7 @@ class CreateEmployee(BaseModel):
     home_address: str
     email: EmailStr
     contact_number: str
-    has_spouse: bool
+    has_spouse: str
     primary_language: str
     start_date: date
     role: str
@@ -92,7 +92,7 @@ class UpdateEmployee(BaseModel):
     home_address: str
     email: EmailStr
     contact_number: str
-    has_spouse: bool
+    has_spouse: str
     primary_language: str
     start_date: date
     role: str
