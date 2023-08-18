@@ -81,6 +81,8 @@ async def create_employee(employee_json: str = Form(...), employee_image: Upload
 
     employee_data = json.loads(employee_json)
 
+    # remove employee id
+    # del employee_data['id']
 
     # image = employee_image.read()
 
@@ -103,7 +105,7 @@ async def create_employee(employee_json: str = Form(...), employee_image: Upload
 
     # generate url with the image name
     s3_read_url = generate_s3_url(s3_img_path, 'read')
-    
+
     # append s3_read_url to employee_data
     employee_data['img_url'] = s3_read_url
 
@@ -113,18 +115,21 @@ async def create_employee(employee_json: str = Form(...), employee_image: Upload
     user = await User.get(id=employee_data['user_id']).values('id')
 
     # make a json object called specified_skills_object that contains the specified skills above
-    employee_data['specified_skills_object'] = [
-        {
-            'id': 1,
-            'specified_skills_period_from': employee_data['specified_skills_object_1_from'],
-            'specified_skills_period_to': employee_data['specified_skills_object_1_to']
-        },
-        {
-            'id': 2,
-            'specified_skills_period_from': employee_data['specified_skills_object_2_from'],
-            'specified_skills_period_to': employee_data['specified_skills_object_2_to']
-        }]
-    
+    employee_data['specified_skills_object'] = json.dumps({
+        "items": [
+            {
+                "id": 1,
+                "from_date": employee_data['specified_skills_object_1_from'],
+                "to_date": employee_data['specified_skills_object_1_to']
+            },
+            {
+                "id": 2,
+                "from_date": employee_data['specified_skills_object_2_from'],
+                "to_date": employee_data['specified_skills_object_2_to']
+            }
+        ]
+    })
+
     del employee_data['specified_skills_object_1_from']
     del employee_data['specified_skills_object_1_to']
     del employee_data['specified_skills_object_2_from']
@@ -132,12 +137,10 @@ async def create_employee(employee_json: str = Form(...), employee_image: Upload
 
     # # create employee
     emp_data = await Employee.create(**employee_data)
-    
+
     new_employee = await employee_pydantic.from_tortoise_orm(emp_data)
 
     return new_employee
-
-    
 
     # new_employee = await employee_pydantic.from_tortoise_orm(emp_data)
 
@@ -156,21 +159,76 @@ async def create_employee(employee_json: str = Form(...), employee_image: Upload
 #     return ''
 
 
-@router.post("/update_employee", status_code=status.HTTP_201_CREATED)
-async def update_employee(employee: CreateEmployee) -> dict:
-    emp_info = employee.dict(exclude_unset=True)
+@router.put("/update_employee", status_code=status.HTTP_201_CREATED)
+async def update_employee(employee_json: str = Form(...), employee_image: UploadFile = File(None)):
+    # emp_info = employee.dict(exclude_unset=True)
 
-    print(f"email: {emp_info['user_email']}")
+    # if employee_image is string dont upload to s3 bucket
+    if employee_image is not None:
+        is_file_image = employee_image.content_type.startswith('image')
 
-    user = await User.get(email=emp_info['user_email']).values('id')
+        if not is_file_image:
+            raise HTTPException(status_code=400, detail="File is not an image")
 
-    emp_data = await Employee.get(id=emp_info['id']).update(**emp_info)
+        now = datetime.now()
+        image_name = employee_data['name_romaji'].split(
+            ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + employee_image.filename.split('.')[-1]
 
-    employee_id = emp_info['id']
+        # s3_img_url = s3_upload_path + image_name
+        s3_img_path = s3_upload_folder + image_name
 
-    new_emp_data = await employee_pydantic.from_queryset_single(Employee.get(id=employee_id))
+        # upload to s3 bucket
+        uploaded_file = upload_image_to_s3(employee_image, image_name)
 
-    return {"data": new_emp_data, "msg": 'Employee Updated.'}
+        print("uploaded: ", uploaded_file)
+
+        # generate url with the image name
+        s3_read_url = generate_s3_url(s3_img_path, 'read')
+
+        # append s3_read_url to employee_data
+        employee_data['img_url'] = s3_read_url
+
+        print("s3_read_url: ", s3_read_url)
+
+    employee_data = json.loads(employee_json)
+
+    # check if employee_data['specified_skills_object_1_from'] exists
+    if 'specified_skills_object_1_from' in employee_data:
+        # make a json object called specified_skills_object that contains the specified skills above
+        employee_data['specified_skills_object'] = json.dumps({
+            "items": [
+                {
+                    "id": 1,
+                    "from_date": employee_data['specified_skills_object_1_from'],
+                    "to_date": employee_data['specified_skills_object_1_to']
+                },
+                {
+                    "id": 2,
+                    "from_date": employee_data['specified_skills_object_2_from'],
+                    "to_date": employee_data['specified_skills_object_2_to']
+                }
+            ]
+        })
+
+        del employee_data['specified_skills_object_1_from']
+        del employee_data['specified_skills_object_1_to']
+        del employee_data['specified_skills_object_2_from']
+        del employee_data['specified_skills_object_2_to']
+
+        # del employee_data['specified_skills_object_1_from']
+        # del employee_data['specified_skills_object_1_to']
+        # del employee_data['specified_skills_object_2_from']
+        # del employee_data['specified_skills_object_2_to']
+
+    employee_data_copy = employee_data.copy()
+    # remove id
+    employee_data_copy.pop('id')
+
+    await Employee.get(id=employee_data['id']).update(**employee_data_copy)
+
+    updated_employee = await employee_pydantic.from_queryset_single(Employee.get(id=employee_data['id']))
+
+    return updated_employee
 
 
 @router.post("/create_employee_immigration_details", status_code=status.HTTP_201_CREATED)

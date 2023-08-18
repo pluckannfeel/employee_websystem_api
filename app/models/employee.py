@@ -40,7 +40,7 @@ class Employee(Model):
     intermediary_agency_name= fields.CharField(max_length=128, null=True)
     intermediary_contact_number= fields.CharField(max_length=128, null=True)
     enrollment_status = fields.CharField(max_length=128, null=False)
-    return_date = fields.DateField(null=False)
+    return_date = fields.DateField(null=True)
     specified_skills_object = fields.CharField(max_length=512, null=True) # object
     # [{
         # id : 1,
