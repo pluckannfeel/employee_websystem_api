@@ -19,7 +19,7 @@ from app.models.employee_school_work_history import Emp_School_Work_History, emp
 from app.models.employee_qualifications import Emp_Qualification, emp_qualifications_pydantic
 
 # pydantic schema
-from app.models.employee_schema import CreateEmployee, CreateEmployeeImmigrationDetails, CreateEmployeeRelatives, CreateEmployeeSchoolWorkHistory, CreateEmployeeQualifications
+from app.models.employee_schema import DeleteEmployee, CreateEmployeeImmigrationDetails, CreateEmployeeRelatives, CreateEmployeeSchoolWorkHistory, CreateEmployeeQualifications
 
 # fastapi
 from fastapi import APIRouter, Depends, status, Request, HTTPException, File, Form, UploadFile
@@ -51,9 +51,9 @@ async def get_employees(user_email_token: str):
     # get the user id from the token # change this later to token id
     user = await User.get(email=user_email_token).values('id')
 
-    employees = Employee.filter(
-        # user_id=user_id['id']).order_by('display_order').all()
-        user_id=user['id']).all()
+    employees = Employee.filter(disabled=False,
+                                # user_id=user_id['id']).order_by('display_order').all()
+                                user_id=user['id']).all()
 
     employee_list = await employee_pydantic.from_queryset(employees)
 
@@ -231,13 +231,38 @@ async def update_employee(employee_json: str = Form(...), employee_image: Upload
     return updated_employee
 
 
+@router.put("/delete_employees", status_code=status.HTTP_201_CREATED)
+async def delete_employee(employees: DeleteEmployee):
+    employees = employees.dict(exclude_unset=True)
+
+    # update all employees in the list employees's disabled to true
+    await Employee.filter(id__in=employees['employees']).update(disabled=True)
+    # await Employee.filter(id__in=employe  es['ids']).delete()
+
+    return employees['employees']
+
+    # return {'msg': 'Employees deleted successfully.'}
+
+# immigration details
+
+
+@router.get("/immigration_details")
+async def get_employee_immigration_details(employee_id: str):
+    # fetch employee_immigration_details
+    immigration_details = await Emp_Immigration_Details.filter(id=employee_id).all()
+    
+    print(immigration_details)
+    
+    # check if there is data
+    if immigration_details:
+        return immigration_details
+    
+    return {}
+
+
 @router.post("/create_employee_immigration_details", status_code=status.HTTP_201_CREATED)
 async def create_employee_immigration_details(immigration_details: CreateEmployeeImmigrationDetails) -> dict:
     immigration_details = immigration_details.dict(exclude_unset=True)
-
-    # replace employee to employee_id
-    immigration_details['employee_id'] = immigration_details['employee']
-    del immigration_details['employee']
 
     immigration_data = await Emp_Immigration_Details.create(**immigration_details)
 

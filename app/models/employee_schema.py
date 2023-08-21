@@ -19,7 +19,8 @@ class GetEmployeeDetails(BaseModel):
 # class ImageInfo(BaseModel):
 #     file_name: str
 #     content_type: str
-#     image_data: bytes 
+#     image_data: bytes
+
 
 class CreateEmployee(BaseModel):
     user_id: str  # get the id of the user from the email
@@ -139,49 +140,66 @@ class UpdateEmployee(BaseModel):
 
 
 class DeleteEmployee(BaseModel):
-    id: str
-    user: str
+    employees: list
 
 
 class CreateEmployeeImmigrationDetails(BaseModel):
-    employee: str
+    employee_id: str
     passport_number: str
-    residence_card_number: str
-    receipt_number: str
-    effective_date: date
-    passport_number_list: str
-    departure_date: date
-    entry_date: date
+    passport_expiration_date: date
+    passport_number_list: list
+
+    scheduled_departure_date: date
+    scheduled_entry_date: date
     port_of_landing: str
     length_of_stay: int
+
     accompany: bool
     place_of_visa_application: str
-    prev_entry_count: int
-    prev_entry_date: date
-    prev_departure_date: date
+
+    actual_entry_date: date
+    past_entry_count: int
+    recent_entry_date: date
+    recent_departure_date: date
+    
     commited_offense: bool
     commited_offense_details: str
+    
+    forced_departure: bool
     forced_departure_count: int
-    recent_forced_departure_date: date
+    forced_departure_date_from: date
+    forced_departure_date_to: date
+    
+    birth_place: str
+    home_address: str
+    contact_number: str
+    
+    # from employee details
+    present_address: str
+    postal_code: str
+    
+    
+    residence_card_number: str
+    receipt_document_number: str
 
-    class Config:
-        json_encoders = {
-            SecretStr: lambda v: v.get_secret_value() if v else None
-        }
+    # class Config:
+    #     json_encoders = {
+    #         SecretStr: lambda v: v.get_secret_value() if v else None
+    #     }
 
-    @root_validator(pre=True)
-    def user_validator(cls, values):
-        # check values if there is one null
-        for value in values:
-            if len(str(values.get(value))) == 0:
-                raise ValueError(f'Form has an empty field. : {value}')
+    # @root_validator(pre=True)
+    # def user_validator(cls, values):
+    #     # check values if there is one null
+    #     for value in values:
+    #         if len(str(values.get(value))) == 0:
+    #             raise ValueError(f'Form has an empty field. : {value}')
 
-        # check if password and confirm password not matches
-        # password, confirm = values.get('password_hash'), values.get('confirm_password')
-        # if password != confirm:
-        #     raise ValueError('password and confirm password does not match.')
+    #     # check if password and confirm password not matches
+    #     # password, confirm = values.get('password_hash'), values.get('confirm_password')
+    #     # if password != confirm:
+    #     #     raise ValueError('password and confirm password does not match.')
 
-        return values
+    #     return values
 
 
 class UpdateEmployeeImmigrationDetails(BaseModel):

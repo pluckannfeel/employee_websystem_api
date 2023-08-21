@@ -15,10 +15,8 @@ class Employee(Model):
     gender = fields.CharField(max_length=5, null=True)
     age = fields.IntField(null=True)
     birth_date = fields.DateField(null=True)
-    birth_place = fields.CharField(max_length=128, null=True)
     present_address = fields.CharField(max_length=256, null=True)
     postal_code = fields.CharField(max_length=128, null=True)
-    home_address = fields.CharField(max_length=256, null=True)
     email = fields.CharField(max_length=128, null=True, unique=True)
     contact_number = fields.CharField(max_length=128, null=True)
     has_spouse = fields.CharField(max_length=5, null=True)
@@ -59,7 +57,7 @@ class Employee(Model):
     memo = fields.TextField(null=True)
     # display_order = fields.IntField(null=False) # included but not needed
     created_at = fields.DatetimeField(auto_now_add=True)
-    
+    disabled = fields.BooleanField(null=False, default=False)
     # @staticmethod
     # def get_full_name(self) -> str:
     #     return self.name_romaji
