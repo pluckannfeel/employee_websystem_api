@@ -246,29 +246,40 @@ async def delete_employee(employees: DeleteEmployee):
 # immigration details
 
 
+async def immigration_details_exists(employee_id: str):
+    details = await Emp_Immigration_Details.filter(employee_id=employee_id).first()
+    return details is not None
+
+
 @router.get("/immigration_details")
 async def get_employee_immigration_details(employee_id: str):
-    # fetch employee_immigration_details
-    immigration_details = await Emp_Immigration_Details.filter(id=employee_id).all()
-    
-    print(immigration_details)
-    
-    # check if there is data
-    if immigration_details:
-        return immigration_details
-    
-    return {}
+    # check if there is immigration details exists
+    exists = await immigration_details_exists(employee_id)
+    if not exists:
+        return {}
+
+    employee_immigration_details = await Emp_Immigration_Details.get(employee_id=employee_id)
+
+    return employee_immigration_details
+
+    #  raise HTTPException(
+    #         status_code=501, detail="Error loading employee immigration details")
 
 
 @router.post("/create_employee_immigration_details", status_code=status.HTTP_201_CREATED)
-async def create_employee_immigration_details(immigration_details: CreateEmployeeImmigrationDetails) -> dict:
-    immigration_details = immigration_details.dict(exclude_unset=True)
+async def create_employee_immigration_details(immigration_details_json: str = Form(...)) -> dict:
+    immigration_details = json.loads(immigration_details_json)
+
+    # delete contact_number
+    del immigration_details['contact_number']
 
     immigration_data = await Emp_Immigration_Details.create(**immigration_details)
 
     new_emp_immigration_data = await emp_immigration_details_pydantic.from_tortoise_orm(immigration_data)
 
-    return {'data': new_emp_immigration_data, 'msg':  'Employee immigration details created successfully.'}
+    return new_emp_immigration_data
+
+    # return {'data': new_emp_immigration_data, 'msg':  'Employee immigration details created successfully.'}
 
 
 @router.post("/create_employee_relatives", status_code=status.HTTP_201_CREATED)

@@ -15,8 +15,7 @@ class Employee(Model):
     gender = fields.CharField(max_length=5, null=True)
     age = fields.IntField(null=True)
     birth_date = fields.DateField(null=True)
-    present_address = fields.CharField(max_length=256, null=True)
-    postal_code = fields.CharField(max_length=128, null=True)
+    
     email = fields.CharField(max_length=128, null=True, unique=True)
     contact_number = fields.CharField(max_length=128, null=True)
     has_spouse = fields.CharField(max_length=5, null=True)
@@ -27,6 +26,7 @@ class Employee(Model):
     work_area_section = fields.CharField(max_length=128, null=True)
     company_name = fields.CharField(max_length=128, null=True)
     company_address = fields.CharField(max_length=128, null=True)
+    company_postal_code = fields.CharField(max_length=64, null=True)
     work_conditions_master = fields.CharField(max_length=128, null=True)
     work_conditions_japanese = fields.CharField(max_length=128, null=True)
     reg_support_manager = fields.CharField(max_length=128, null=True)

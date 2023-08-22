@@ -33,7 +33,7 @@ class CreateEmployee(BaseModel):
     birth_date: date
     birth_place: str
     present_address: str
-    postal_code: str
+    company_postal_code: str
     home_address: str
     email: EmailStr
     contact_number: str
@@ -89,7 +89,7 @@ class UpdateEmployee(BaseModel):
     birth_date: date
     birth_place: str
     present_address: str
-    postal_code: str
+    company_postal_code: str
     home_address: str
     email: EmailStr
     contact_number: str
@@ -147,7 +147,7 @@ class CreateEmployeeImmigrationDetails(BaseModel):
     employee_id: str
     passport_number: str
     passport_expiration_date: date
-    passport_number_list: list
+    old_passport_number_list: list
 
     scheduled_departure_date: date
     scheduled_entry_date: date
@@ -176,7 +176,7 @@ class CreateEmployeeImmigrationDetails(BaseModel):
     
     # from employee details
     present_address: str
-    postal_code: str
+    present_address_postal_code: str
     
     
     residence_card_number: str
