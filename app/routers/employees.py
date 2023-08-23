@@ -280,6 +280,22 @@ async def create_employee_immigration_details(immigration_details_json: str = Fo
     return new_emp_immigration_data
 
     # return {'data': new_emp_immigration_data, 'msg':  'Employee immigration details created successfully.'}
+    
+@router.put("/update_employee_immigration_details", status_code=status.HTTP_201_CREATED)
+async def create_employee_immigration_details(immigration_details_json: str = Form(...)) -> dict:
+    data = json.loads(immigration_details_json)
+    
+    copied_data = data.copy()
+    
+    #delete contact_number
+    del copied_data['contact_number']
+    del copied_data['id']
+    
+    await Emp_Immigration_Details.get(id=data['id']).update(**copied_data)
+
+    updated_data = await emp_immigration_details_pydantic.from_queryset_single(Emp_Immigration_Details.get(id=data['id']))
+
+    return updated_data
 
 
 @router.post("/create_employee_relatives", status_code=status.HTTP_201_CREATED)

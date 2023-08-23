@@ -21,6 +21,7 @@ class Emp_Immigration_Details(Model):
     place_of_visa_inspection = fields.CharField(max_length=128, null=True)
     
     actual_entry_date = fields.DateField(null=True)
+    past_entry = fields.CharField(max_length=10, null=True)
     past_entry_count = fields.IntField(null=True)
     recent_entry_date = fields.DateField(null=True)
     recent_departure_date = fields.DateField(null=True)
