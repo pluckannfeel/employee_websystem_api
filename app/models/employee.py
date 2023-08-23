@@ -16,7 +16,7 @@ class Employee(Model):
     age = fields.IntField(null=True)
     birth_date = fields.DateField(null=True)
     
-    email = fields.CharField(max_length=128, null=True, unique=True)
+    email = fields.CharField(max_length=128, null=True, unique=False)
     contact_number = fields.CharField(max_length=128, null=True)
     has_spouse = fields.CharField(max_length=5, null=True)
     primary_language = fields.CharField(max_length=128, null=True)

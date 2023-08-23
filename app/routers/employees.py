@@ -238,6 +238,9 @@ async def delete_employee(employees: DeleteEmployee):
     # update all employees in the list employees's disabled to true
     await Employee.filter(id__in=employees['employees']).update(disabled=True)
     # await Employee.filter(id__in=employe  es['ids']).delete()
+    
+    # delete employee immigration details
+    await Emp_Immigration_Details.filter(employee_id__in=employees['employees']).delete()
 
     return employees['employees']
 
