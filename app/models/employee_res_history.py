@@ -3,11 +3,12 @@ from tortoise import fields
 from tortoise.contrib.pydantic.creator import pydantic_model_creator
 
 
-class Emp_School_Work_History(Model):
+class Emp_RES_History(Model):
     id = fields.UUIDField(pk=True, index=True)
     employee = fields.ForeignKeyField(
-        'models.Employee', related_name='emp_school_work_history', on_delete='CASCADE')
-    work_history = fields.TextField(null=False)  # object
+        'models.Employee', related_name='emp_res_history', on_delete='CASCADE')
+    relatives = fields.TextField(null=False)  # object
+    education_history = fields.TextField(null=False)  # object
     # start_date
     # end_date
     # company_name
@@ -18,9 +19,9 @@ class Emp_School_Work_History(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
-        table = "emp_school_work_history"
+        table = "employee_res_history"
         ordering = ["created_at"]
 
 
-emp_school_work_history_pydantic = pydantic_model_creator(
-    Emp_School_Work_History, name="Emp_School_Work_History", exclude=("created_at", ))
+emp_res_pydantic = pydantic_model_creator(
+    Emp_RES_History, name="Emp_RES_History", exclude=("created_at", ))

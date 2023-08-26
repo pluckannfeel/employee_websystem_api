@@ -15,7 +15,7 @@ from app.models.user import User, user_pydantic
 from app.models.employee import Employee, employee_pydantic
 from app.models.employee_immigration_details import Emp_Immigration_Details, emp_immigration_details_pydantic
 from app.models.employee_relatives import Emp_Relatives, emp_relatives_pydantic
-from app.models.employee_school_work_history import Emp_School_Work_History, emp_school_work_history_pydantic
+from app.models.employee_res_history import Emp_RES_History, emp_res_pydantic
 from app.models.employee_qualifications import Emp_Qualification, emp_qualifications_pydantic
 
 # pydantic schema
@@ -300,47 +300,23 @@ async def create_employee_immigration_details(immigration_details_json: str = Fo
 
     return updated_data
 
-
-@router.post("/create_employee_relatives", status_code=status.HTTP_201_CREATED)
-async def create_employee_relatives(relatives: CreateEmployeeRelatives) -> dict:
-    relatives_details = relatives.dict(exclude_unset=True)
-
-    # replace employee to employee_id
-    relatives_details['employee_id'] = relatives_details['employee']
-    del relatives_details['employee']
-
-    relatives_data = await Emp_Relatives.create(**relatives_details)
-
-    new_relatives_data = await emp_relatives_pydantic.from_tortoise_orm(relatives_data)
-
-    return {'data': new_relatives_data, 'msg': 'Employee relatives added.'}
+async def res_history_exists(employee_id: str):
+    details = await Emp_RES_History.filter(employee_id=employee_id).first()
+    return details is not None
 
 
-@router.post("/create_employee_schoolwork_history", status_code=status.HTTP_201_CREATED)
-async def create_employee_schoolwork_history(history: CreateEmployeeSchoolWorkHistory) -> dict:
-    history_details = history.dict(exclude_unset=True)
+@router.get("/res_history")
+async def get_res_history(employee_id: str):
+    # check if there is immigration details exists
+    exists = await res_history_exists(employee_id)
+    if not exists:
+        return {}
 
-    # replace employee to employee_id
-    history_details['employee_id'] = history_details['employee']
-    del history_details['employee']
+    history = await Emp_RES_History.get(employee_id=employee_id)
 
-    history_data = await Emp_School_Work_History.create(**history_details)
+    return history
 
-    new_history_data = await emp_school_work_history_pydantic.from_tortoise_orm(history_data)
-
-    return {'data': new_history_data, 'msg': 'Employee school work history added.'}
+    #  raise HTTPException(
+    #         status_code=501, detail="Error loading employee immigration details")
 
 
-@router.post("/create_employee_qualifications", status_code=status.HTTP_201_CREATED)
-async def create_employee_qualifications(qualifications: CreateEmployeeQualifications) -> dict:
-    qualifications_details = qualifications.dict(exclude_unset=True)
-
-    # replace employee to employee_id
-    qualifications_details['employee_id'] = qualifications_details['employee']
-    del qualifications_details['employee']
-
-    qualifications_data = await Emp_Qualification.create(**qualifications_details)
-
-    new_qualifications_data = await emp_qualifications_pydantic.from_tortoise_orm(qualifications_data)
-
-    return {'data': new_qualifications_data, 'msg': 'Employee qualifications added.'}
