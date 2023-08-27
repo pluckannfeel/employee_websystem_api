@@ -8,7 +8,7 @@ class Emp_RES_History(Model):
     employee = fields.ForeignKeyField(
         'models.Employee', related_name='emp_res_history', on_delete='CASCADE')
     relatives = fields.TextField(null=False)  # object
-    education_history = fields.TextField(null=False)  # object
+    employment_history = fields.TextField(null=False)  # object
     # start_date
     # end_date
     # company_name

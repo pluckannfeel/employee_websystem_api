@@ -381,3 +381,46 @@ class CreateEmployeeQualifications(BaseModel):
                 raise ValueError(f'Form has an empty field. : {value}')
 
         return values
+
+class CreateEmployeeRESHistory(BaseModel):
+    employee_id: str
+    relatives: str
+    employment_history: str
+    school_history: str
+    
+    class Config:
+        json_encoders = {
+            SecretStr: lambda v: v.get_secret_value() if v else None
+        }
+
+    @root_validator(pre=True)
+    def user_validator(cls, values):
+        # check values if there is one null
+
+        for value in values:
+            if len(str(values.get(value))) == 0:
+                raise ValueError(f'Form has an empty field. : {value}')
+
+        return values
+    
+class UpdateEmployeeRESHistory(BaseModel):
+    id: str
+    relatives: str
+    employment_history: str
+    school_history: str
+    
+    class Config:
+        json_encoders = {
+            SecretStr: lambda v: v.get_secret_value() if v else None
+        }
+
+    @root_validator(pre=True)
+    def user_validator(cls, values):
+        # check values if there is one null
+
+        for value in values:
+            if len(str(values.get(value))) == 0:
+                raise ValueError(f'Form has an empty field. : {value}')
+
+        return values
+    

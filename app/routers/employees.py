@@ -19,7 +19,7 @@ from app.models.employee_res_history import Emp_RES_History, emp_res_pydantic
 from app.models.employee_qualifications import Emp_Qualification, emp_qualifications_pydantic
 
 # pydantic schema
-from app.models.employee_schema import DeleteEmployee, CreateEmployeeImmigrationDetails, CreateEmployeeRelatives, CreateEmployeeSchoolWorkHistory, CreateEmployeeQualifications
+from app.models.employee_schema import DeleteEmployee, CreateEmployeeRESHistory, UpdateEmployeeRESHistory
 
 # fastapi
 from fastapi import APIRouter, Depends, status, Request, HTTPException, File, Form, UploadFile
@@ -162,6 +162,8 @@ async def create_employee(employee_json: str = Form(...), employee_image: Upload
 @router.put("/update_employee", status_code=status.HTTP_201_CREATED)
 async def update_employee(employee_json: str = Form(...), employee_image: UploadFile = File(None)):
     # emp_info = employee.dict(exclude_unset=True)
+    
+    employee_data = json.loads(employee_json)
 
     # if employee_image is string dont upload to s3 bucket
     if employee_image is not None:
@@ -169,7 +171,7 @@ async def update_employee(employee_json: str = Form(...), employee_image: Upload
 
         if not is_file_image:
             raise HTTPException(status_code=400, detail="File is not an image")
-
+        
         now = datetime.now()
         image_name = employee_data['name_romaji'].split(
             ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + employee_image.filename.split('.')[-1]
@@ -190,7 +192,7 @@ async def update_employee(employee_json: str = Form(...), employee_image: Upload
 
         print("s3_read_url: ", s3_read_url)
 
-    employee_data = json.loads(employee_json)
+    
 
     # check if employee_data['specified_skills_object_1_from'] exists
     if 'specified_skills_object_1_from' in employee_data:
@@ -314,9 +316,43 @@ async def get_res_history(employee_id: str):
 
     history = await Emp_RES_History.get(employee_id=employee_id)
 
+    # convert relatives, employment_history, school_history to json
+    history.relatives = json.loads(history.relatives)
+    history.employment_history = json.loads(history.employment_history)
+    history.school_history = json.loads(history.school_history)
+    
     return history
 
     #  raise HTTPException(
     #         status_code=501, detail="Error loading employee immigration details")
+    
+@router.post("/create_employee_res_history", status_code=status.HTTP_201_CREATED)
+async def create_employee_res_history(res_history: CreateEmployeeRESHistory) -> dict:
+    history = res_history.dict(exclude_unset=True)
+
+    print("history: ", history)
+
+    history_data = await Emp_RES_History.create(**history)
+    
+    new_history_data = await emp_res_pydantic.from_tortoise_orm(history_data)
+
+    # new_emp_immigration_data = await emp_immigration_details_pydantic.from_tortoise_orm(immigration_data)
+
+    return new_history_data
+
+@router.put("/update_employee_res_history", status_code=status.HTTP_201_CREATED)
+async def create_employee_res_history(res_history: UpdateEmployeeRESHistory) -> dict:
+    history = res_history.dict(exclude_unset=True)
+
+    # print("history: ", history)
+    copied_history = history.copy()
+    
+    del copied_history['id']
+    
+    await Emp_RES_History.get(id=history['id']).update(**copied_history)
+    
+    updated_history_data = await emp_res_pydantic.from_queryset_single(Emp_RES_History.get(id=history['id']))
+    
+    return updated_history_data
 
 
