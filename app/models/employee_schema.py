@@ -424,3 +424,44 @@ class UpdateEmployeeRESHistory(BaseModel):
 
         return values
     
+class CreateEmployeeQualificationsLicense(BaseModel):
+    employee_id: str
+    qualifications_licenses: str
+    prev_technical_work: str
+    
+    
+    class Config:
+        json_encoders = {
+            SecretStr: lambda v: v.get_secret_value() if v else None
+        }
+
+    @root_validator(pre=True)
+    def user_validator(cls, values):
+        # check values if there is one null
+
+        for value in values:
+            if len(str(values.get(value))) == 0:
+                raise ValueError(f'Form has an empty field. : {value}')
+
+        return values
+    
+class UpdateEmployeeQualificationsLicense(BaseModel):
+    id: str
+    qualifications_licenses: str
+    prev_technical_work: str
+    
+    class Config:
+        json_encoders = {
+            SecretStr: lambda v: v.get_secret_value() if v else None
+        }
+
+    @root_validator(pre=True)
+    def user_validator(cls, values):
+        # check values if there is one null
+
+        for value in values:
+            if len(str(values.get(value))) == 0:
+                raise ValueError(f'Form has an empty field. : {value}')
+
+        return values
+    

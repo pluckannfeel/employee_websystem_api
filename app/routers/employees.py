@@ -16,10 +16,10 @@ from app.models.employee import Employee, employee_pydantic
 from app.models.employee_immigration_details import Emp_Immigration_Details, emp_immigration_details_pydantic
 from app.models.employee_relatives import Emp_Relatives, emp_relatives_pydantic
 from app.models.employee_res_history import Emp_RES_History, emp_res_pydantic
-from app.models.employee_qualifications import Emp_Qualification, emp_qualifications_pydantic
+from app.models.employee_qualifications_licenses import Emp_Qualification_Licenses, emp_qualifications_licenses_pydantic
 
 # pydantic schema
-from app.models.employee_schema import DeleteEmployee, CreateEmployeeRESHistory, UpdateEmployeeRESHistory
+from app.models.employee_schema import DeleteEmployee, CreateEmployeeRESHistory, UpdateEmployeeRESHistory, CreateEmployeeQualificationsLicense, UpdateEmployeeQualificationsLicense
 
 # fastapi
 from fastapi import APIRouter, Depends, status, Request, HTTPException, File, Form, UploadFile
@@ -162,7 +162,7 @@ async def create_employee(employee_json: str = Form(...), employee_image: Upload
 @router.put("/update_employee", status_code=status.HTTP_201_CREATED)
 async def update_employee(employee_json: str = Form(...), employee_image: UploadFile = File(None)):
     # emp_info = employee.dict(exclude_unset=True)
-    
+
     employee_data = json.loads(employee_json)
 
     # if employee_image is string dont upload to s3 bucket
@@ -171,7 +171,7 @@ async def update_employee(employee_json: str = Form(...), employee_image: Upload
 
         if not is_file_image:
             raise HTTPException(status_code=400, detail="File is not an image")
-        
+
         now = datetime.now()
         image_name = employee_data['name_romaji'].split(
             ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + employee_image.filename.split('.')[-1]
@@ -191,8 +191,6 @@ async def update_employee(employee_json: str = Form(...), employee_image: Upload
         employee_data['img_url'] = s3_read_url
 
         print("s3_read_url: ", s3_read_url)
-
-    
 
     # check if employee_data['specified_skills_object_1_from'] exists
     if 'specified_skills_object_1_from' in employee_data:
@@ -240,7 +238,7 @@ async def delete_employee(employees: DeleteEmployee):
     # update all employees in the list employees's disabled to true
     await Employee.filter(id__in=employees['employees']).update(disabled=True)
     # await Employee.filter(id__in=employe  es['ids']).delete()
-    
+
     # delete employee immigration details
     await Emp_Immigration_Details.filter(employee_id__in=employees['employees']).delete()
 
@@ -285,22 +283,24 @@ async def create_employee_immigration_details(immigration_details_json: str = Fo
     return new_emp_immigration_data
 
     # return {'data': new_emp_immigration_data, 'msg':  'Employee immigration details created successfully.'}
-    
+
+
 @router.put("/update_employee_immigration_details", status_code=status.HTTP_201_CREATED)
 async def create_employee_immigration_details(immigration_details_json: str = Form(...)) -> dict:
     data = json.loads(immigration_details_json)
-    
+
     copied_data = data.copy()
-    
-    #delete contact_number
+
+    # delete contact_number
     del copied_data['contact_number']
     del copied_data['id']
-    
+
     await Emp_Immigration_Details.get(id=data['id']).update(**copied_data)
 
     updated_data = await emp_immigration_details_pydantic.from_queryset_single(Emp_Immigration_Details.get(id=data['id']))
 
     return updated_data
+
 
 async def res_history_exists(employee_id: str):
     details = await Emp_RES_History.filter(employee_id=employee_id).first()
@@ -320,12 +320,13 @@ async def get_res_history(employee_id: str):
     history.relatives = json.loads(history.relatives)
     history.employment_history = json.loads(history.employment_history)
     history.school_history = json.loads(history.school_history)
-    
+
     return history
 
     #  raise HTTPException(
     #         status_code=501, detail="Error loading employee immigration details")
-    
+
+
 @router.post("/create_employee_res_history", status_code=status.HTTP_201_CREATED)
 async def create_employee_res_history(res_history: CreateEmployeeRESHistory) -> dict:
     history = res_history.dict(exclude_unset=True)
@@ -333,26 +334,74 @@ async def create_employee_res_history(res_history: CreateEmployeeRESHistory) -> 
     print("history: ", history)
 
     history_data = await Emp_RES_History.create(**history)
-    
+
     new_history_data = await emp_res_pydantic.from_tortoise_orm(history_data)
 
     # new_emp_immigration_data = await emp_immigration_details_pydantic.from_tortoise_orm(immigration_data)
 
     return new_history_data
 
+
 @router.put("/update_employee_res_history", status_code=status.HTTP_201_CREATED)
-async def create_employee_res_history(res_history: UpdateEmployeeRESHistory) -> dict:
+async def update_employee_res_history(res_history: UpdateEmployeeRESHistory) -> dict:
     history = res_history.dict(exclude_unset=True)
 
     # print("history: ", history)
     copied_history = history.copy()
-    
+
     del copied_history['id']
-    
+
     await Emp_RES_History.get(id=history['id']).update(**copied_history)
-    
+
     updated_history_data = await emp_res_pydantic.from_queryset_single(Emp_RES_History.get(id=history['id']))
-    
+
     return updated_history_data
 
 
+async def qualifications_licenses_exists(employee_id: str):
+    details = await Emp_Qualification_Licenses.filter(employee_id=employee_id).first()
+    return details is not None
+
+
+@router.get("/qualifications_licenses")
+async def get_qualifications_licenses(employee_id: str):
+    # check if there is immigration details exists
+    exists = await qualifications_licenses_exists(employee_id)
+    if not exists:
+        return {}
+
+    details = await Emp_Qualification_Licenses.get(employee_id=employee_id)
+
+    details.prev_technical_work = json.loads(details.prev_technical_work)
+
+    return details
+
+
+@router.post("/create_employee_qualifications_licenses", status_code=status.HTTP_201_CREATED)
+async def create_employee_qualifications_licenses(ql_details: CreateEmployeeQualificationsLicense) -> dict:
+    details = ql_details.dict(exclude_unset=True)
+
+    # print("history: ", details)
+
+    data = await Emp_Qualification_Licenses.create(**details)
+
+    new_data = await emp_qualifications_licenses_pydantic.from_tortoise_orm(data)
+
+    # new_emp_immigration_data = await emp_immigration_details_pydantic.from_tortoise_orm(immigration_data)
+
+    return new_data
+
+@router.put("/update_employee_qualifications_licenses", status_code=status.HTTP_201_CREATED)
+async def update_employee_qualifications_licenses(ql_details: UpdateEmployeeQualificationsLicense) -> dict:
+    details = ql_details.dict(exclude_unset=True)
+
+    # print("details: ", details)
+    copied_details = details.copy()
+
+    del copied_details['id']
+
+    await Emp_Qualification_Licenses.get(id=details['id']).update(**copied_details)
+
+    updated_data = await emp_qualifications_licenses_pydantic.from_queryset_single(Emp_Qualification_Licenses.get(id=details['id']))
+
+    return updated_data

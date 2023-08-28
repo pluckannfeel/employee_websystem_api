@@ -17,10 +17,8 @@ def initialize_db(app):
                 'app.models.user', 
                 'app.models.employee',
                 'app.models.employee_immigration_details',
-                # 'app.models.employee_relatives',
-                'app.models.employee_qualifications',
+                'app.models.employee_qualifications_licenses',
                 'app.models.employee_res_history',
-                # 'models.user_img',
             ]
         },
         generate_schemas=True,
