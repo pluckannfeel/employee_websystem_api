@@ -33,7 +33,7 @@ from app.auth.email_verification import send_email
 from app.helpers.s3_file_upload import upload_image_to_s3, generate_s3_url
 
 # s3_upload_path = os.environ['AWS_PPS_STORAGE_URL'] + 'uploads/employees/img/'
-s3_upload_folder = 'uploads/employees/img/'
+s3_upload_folder = 'uploads/staff/img/'
 
 router = APIRouter(
     prefix="/employees",

@@ -22,6 +22,7 @@ from app.db.init import initialize_db
 # routers
 from app.routers.users import router as userRouter
 from app.routers.employees import router as employeeRouter
+from app.routers.staff import router as staffRouter
 
 from mangum import Mangum
 
@@ -91,7 +92,8 @@ async def main():
 
 # ROUTERS
 app.include_router(userRouter)
-app.include_router(employeeRouter)
+app.include_router(staffRouter)
+# app.include_router(employeeRouter)
 
 # aws lambda
 # handler = Mangum(app, lifespan="off")

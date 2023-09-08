@@ -49,7 +49,7 @@ def upload_file_to_s3(file_object, app_type):
         return {"filename": file_object.filename}
 
 def upload_image_to_s3(imageFile, new_image_name):    
-    object_name = f'uploads/employees/img/{new_image_name}' 
+    object_name = f'uploads/staff/img/{new_image_name}' 
     temp = NamedTemporaryFile(delete=False)
     try:
         try:
