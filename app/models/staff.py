@@ -35,16 +35,14 @@ class Staff(Model):
     # license_name
     # license_date
     # license_file_link
-
-    # nursing_care_specialist = fields.CharField(max_length=128, null=True) #介護支援専門員
-    # certified_care_worker = fields.CharField(max_length=128, null=True) #介護福祉士
-    # home_helper_level1 = fields.CharField(max_length=128, null=True) #ホームヘルパー1級
-    # home_helper_level2 = fields.CharField(max_length=128, null=True) #ホームヘルパー2級
-    # beginner_care_workers_training = fields.CharField(max_length=128, null=True) #介護職員初任者研修
-    # practical_care_workers_training = fields.CharField(max_length=128, null=True) #介護福祉士実務者研修
-    # basic_pwd_care_workers_training = fields.CharField(max_length=128, null=True) #障害者居宅介護従業者基礎研修課程 Basic training course for in-home care workers for persons with disabilities
-    # basic_shv_care_employees_training = fields.CharField(max_length=128, null=True) #重度訪問介護従業者養成研修(基礎) Training for Employees of Severe Home-Visit Care (Basic)
-    # basic_shv_care_employees_training_plus = fields.CharField(max_length=128, null=True) #重度訪問介護従業者養成研修(追加) Training for Employees of Severe Home-Visit Care (additional)
+    # bank_details = fields.TextField(null=True) 
+    customer_number = fields.CharField(max_length=64, null=True) #顧客番号
+    bank_name = fields.CharField(max_length=64, null=True) #銀行名
+    branch_name = fields.CharField(max_length=64, null=True) #支店名
+    account_type = fields.CharField(max_length=64, null=True) #口座種別
+    account_number = fields.CharField(max_length=64, null=True) #口座番号
+    account_name = fields.CharField(max_length=64, null=True) #口座名義
+    
     disabled = fields.BooleanField(null=False, default=False) # instead of deleting the record, we just set this to true
     created_at = fields.DatetimeField(auto_now_add=True)
     

@@ -23,6 +23,7 @@ from app.db.init import initialize_db
 from app.routers.users import router as userRouter
 from app.routers.employees import router as employeeRouter
 from app.routers.staff import router as staffRouter
+from app.routers.japan_addresses import router as japanAddressesRouter
 
 from mangum import Mangum
 
@@ -45,11 +46,14 @@ initialize_db(app)
 
 
 origins = [
-    "http://localhost",
+    # "http://localhost",
     'http://localhost:8080',
-    'http://127.0.0.1:3000',
     'http://localhost:3000',
-    'http://localhost:8000',
+    'http://ews-bucket.s3-website-ap-northeast-1.amazonaws.com/employee-web-system',
+    # 'https://ews-bucket.s3-website-ap-northeast-1.amazonaws.com',
+    # 'http://ews-bucket.s3.amazonaws.com',
+    'http://ews-bucket.s3-website-ap-northeast-1.amazonaws.com'
+    # 'http://ews-bucket.s3.ap-northeast-1.amazonaws.com',
 ]
 
 # middlewares
@@ -93,6 +97,7 @@ async def main():
 # ROUTERS
 app.include_router(userRouter)
 app.include_router(staffRouter)
+app.include_router(japanAddressesRouter)
 # app.include_router(employeeRouter)
 
 # aws lambda
