@@ -4,3 +4,5 @@ docker-compose.yml
 DockerFile
 DockerFile.pgadmin
 Pipfile.lock
+
+zappa_settings.json

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import json
+import os
 
 from typing import List, Type
 
@@ -8,7 +9,11 @@ from fastapi import APIRouter, status, HTTPException, File, Form, UploadFile
 
 # models
 from app.models.user import User
-from app.models.staff import Staff, staff_pydantic
+from app.models.staff import Staff, staff_pydantic, staffSelect_pydantic
+
+# helpers 
+from app.helpers.zipfile import zipfiles
+from app.helpers.generate_pdf import fill_pdf_contract
 
 # s3
 from app.helpers.s3_file_upload import upload_file_to_s3, generate_s3_url, upload_image_to_s3
@@ -27,24 +32,31 @@ router = APIRouter(
     responses={404: {"some_description": "Not found"}}
 )
 
-@router.get("/", responses={status.HTTP_201_CREATED: {"model": staff_pydantic}})
-async def get_staff(user_email_token: str, staff_group: str):
+@router.get("")
+# async def get_staff(user_email_token: str, staff_group: str):
+async def get_staff(staff_group: str):
     # get the user email from the token
     # for more security later, we can use the user id instead of email
     # user_email = verify_token_email(user_email_token)
 
     # get the user id from the token # change this later to token id
-    user = await User.get(email=user_email_token).values('id')
+    # user = await User.get(email=user_email_token).values('id')
 
     # group the list with the staff group "caregiver" or "user"
+    # if staff_group == 'staff' or staff_group  == 'スタッフ':
+    #     staff = Staff.filter(disabled=False, staff_group='スタッフ',
+    #                             # user_id=user_id['id']).order_by('display_order').all()
+    #                             user_id=user['id']).all()
+    # elif staff_group == 'user' or staff_group == '利用者':
+    #     staff = Staff.filter(disabled=False, staff_group='利用者',
+    #                             # user_id=user_id['id']).order_by('display_order').all()
+    #                             user_id=user['id']).all()
+
+    # get all staff and just filter with staff group
     if staff_group == 'staff' or staff_group  == 'スタッフ':
-        staff = Staff.filter(disabled=False, staff_group='スタッフ',
-                                # user_id=user_id['id']).order_by('display_order').all()
-                                user_id=user['id']).all()
+        staff = Staff.filter(disabled=False, staff_group='スタッフ').all()
     elif staff_group == 'user' or staff_group == '利用者':
-        staff = Staff.filter(disabled=False, staff_group='利用者',
-                                # user_id=user_id['id']).order_by('display_order').all()
-                                user_id=user['id']).all()
+        staff = Staff.filter(disabled=False, staff_group='利用者').all()
 
     staff_list = await staff_pydantic.from_queryset(staff)
 
@@ -56,7 +68,19 @@ async def get_staff(user_email_token: str, staff_group: str):
 
     return staff_list
 
-@router.post("/add_staff", status_code=status.HTTP_201_CREATED)
+@router.get("/staff_select")
+async def get_staff_select():
+    
+    # same as staff but only take id, english_name, japanese_name, staff_group, duty_type
+    staff = Staff.filter(disabled=False).all()
+
+    staff_list = await staffSelect_pydantic.from_queryset(staff)
+
+    # dont use pydantic
+
+    return staff_list
+
+@router.post("/add_staff")
 async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = File(...), licenses: List[UploadFile] = File(None)):
     staff_data = json.loads(staff_json)
 
@@ -173,7 +197,7 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
     # return new_staff
 
-@router.put("/update_staff", status_code=status.HTTP_201_CREATED)
+@router.put("/update_staff")
 async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None)):
     staff_data = json.loads(staff_json)
 
@@ -283,3 +307,27 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
     # updated_staff = await staff_pydantic.from_queryset_single(Staff.get(id=staff_data['id']))
 
     # return updated_staff
+
+
+@router.get('/generate')
+async def generate_contracts(staff_id: str):
+     # contract_data = await Contract.filter(id=contract_id).select_related('company').values('id', 'worker_name', 'agency_name', 'agency_address', 'agency_rep_name', 'agency_rep_position', 'site_employment', 'contract_duration', 'contract_terms', 'bonus', 'salary_increase', 'work_start_time', 'work_end_time', 'work_rest', 'work_working_days', 'work_days_off', 'work_leave', 'work_other_leave', 'utilities', 'housing_accomodation', 'housing_cost', 'job_title', 'job_description', 'job_duties', 'job_criteria_degree', 'job_criteria_jlpt_level', 'job_criteria_year_exp', 'job_criteria_other', 'job_basic_salary', 'job_total_deductions', 'job_income_tax', 'job_social_insurance', 'job_utilities', 'job_accomodation', 'job_net_salary', 'benefits_housing', 'benefits_utilities', 'benefits_transportation', 'benefits_other', 'company_id', company_name='company__name', company_rep_name='company__rep_name',company_rep_position='company__rep_position', company_address='company__address', company_contact_number='company__contact_number')
+        # get staff name by staff id
+    staff = await Staff.get(id=staff_id).values('english_name')
+    pdf = fill_pdf_contract(staff)
+
+    # open the pdf file in binary mode
+    # with open(pdf, 'rb') as file:
+    zipf = zipfiles(pdf, f'files_{staff_id}')
+
+    # delete pdf 
+    os.remove(pdf)
+    
+    return zipf
+    
+    # try:
+       
+    # except Exception as e:
+    #     print("error while generating contract: ", e)
+        
+    # return {'data': {}, 'msg': 'no data found.'}

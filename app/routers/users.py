@@ -45,17 +45,67 @@ upload_path = get_directory_path() + '\\uploads'
 s3_upload_path = str(os.getenv("AWS_PPS_STORAGE_URI")) + 'uploads'
 
 
-@router.get("/", response_model=List[user_pydantic])
+# @router.get("/get_user_info", tags=["Users"])
+# async def get_user_info(token: str) -> dict:
+#     print("get user info log")
+#     # Verify the token and extract user email
+#     user = await verify_token_email(token)
+
+#     print(user)
+
+#     if not user:
+#         # Raise a 401 Unauthorized error
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Invalid or Expired token.",
+#             headers={"WWW-Authenticate": "Bearer"}
+#         )
+    
+#     # Query the database for user info
+#     user_info = await User.get(email=user.email).values(
+#         'id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at', 'is_verified'
+#     )
+    
+#     if not user_info:
+#         # If user_info is not found, you might want to return a different error status code, e.g., 404 Not Found
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="User not found."
+#         )
+
+#     return user_info
+
+@router.get("", tags=["Users"], name="Get all users")
 async def get_users():
     return await user_pydantic.from_queryset(User.all())
 
+@router.get("/get_user_info", tags=["Users"], name="test")
+async def get_user_info(token: str):
+    # token = await token_generator('millanjarvis421@gmail.com', 'Sivrajnallim96')
+    user = await verify_token_email(token)
 
-@router.get("/{email}", tags=["Users"], name="Get user by email", response_model=user_pydantic, responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
+    if not user:
+    # Raise a 401 Unauthorized error
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or Expired token.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    return user
+
+@router.get("/{email}", tags=["Users"], name="Get user by email", responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
 async def read_user(email: str):
-    return await user_pydantic.from_queryset_single(User.get(email=email))
+    # return await user_pydantic.from_queryset_single(User.get(email=email))
+    # get user credentials by email
+    user_info = await User.get(email=email).values(
+        'id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at', 'is_verified'
+    )
 
+    return user_info
+    
 
-@router.get("/verification/", tags=["Users"], name="Verify User", responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
+@router.get("/verification", tags=["Users"], name="Verify User", responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
 async def verify_user(token: str):  # request: Request,
     user = await verify_token_email(token)
     print("user object ", user)
@@ -113,26 +163,93 @@ async def create_user(user: CreateUser) -> dict:
     return {'user': new_user, 'msg': "new user created."}
 
 
-@router.get("/check_user_info/", tags=["Users"], status_code=status.HTTP_200_OK)
-async def check_user_credentials(token: str) -> dict:
-    # key - token
-    user = await verify_token_email(token)
-    print("user object ", user)
+# @router.get("/check_user_info", tags=["Users"], status_code=status.HTTP_200_OK)
+# async def check_user_credentials(token: str) -> dict:
+#     # key - token
+#     user = await verify_token_email(token)
+#     print("user object ", user)
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or Expired token.",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
+#     if not user:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Invalid or Expired token.",
+#             headers={"WWW-Authenticate": "Bearer"}
+#         )
 
-    # the_user = await User.get(email=email).values('id')
+#     # the_user = await User.get(email=email).values('id')
 
-    user_data = object()
+#     user_data = object()
+
+#     # add this for future purposes if you want to add user image
+#     # this include the user_img table
+#     joined_data = False
+#     # joined_data = await User_Img.filter(user=the_user['id']).prefetch_related('user').order_by('-created_at').values('img_url', 'user__username', 'user__first_name', 'user__last_name', 'user__birth_date', 'user__email', 'user__phone', 'user__is_verified', 'user__created_at')
+
+#     # SQL = User_Img.filter(user=the_user['id']).prefetch_related('user').values('img_url', 'user__username', 'user__first_name', 'user__last_name', 'user__birth_date', 'user__email', 'user__phone', 'user__is_verified', 'user__created_at').sql()
+#     # print(SQL)
+
+#     # if joined data is empty return data without user_img table
+#     # removed birthdate and username
+#     # if not joined_data:
+#     user_only_data = await User.filter(email=user.email).values('id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at')
+#     print(user_only_data[0]['email'])
+
+#     # transform
+#     user_data = {
+#         # 'username': joined_data[0]['user__username'] if joined_data else user_only_data[0]['username'],
+#         'id': joined_data[0]['user__id'] if joined_data else user_only_data[0]['id'],
+#         'firstName': joined_data[0]['user__first_name'] if joined_data else user_only_data[0]['first_name'],
+#         'lastName': joined_data[0]['user__last_name'] if joined_data else user_only_data[0]['last_name'],
+#         'email': joined_data[0]['user__email'] if joined_data else user_only_data[0]['email'],
+#         'phone': joined_data[0]['user__phone'] if joined_data else user_only_data[0]['phone'],
+#         'job': joined_data[0]['user__job'] if joined_data else user_only_data[0]['job'],
+#         # 'birth_date': joined_data[0]['user__birth_date'] if joined_data else user_only_data[0]['birth_date'],
+#         # 'is_verified': joined_data[0]['user__is_verified'] if joined_data else user_only_data[0]['is_verified'],
+#         'role': joined_data[0]['user__role'] if joined_data else user_only_data[0]['role'],
+#         'created_at': joined_data[0]['user__created_at'] if joined_data else user_only_data[0]['created_at'],
+#         'img_url': joined_data[0]['img_url'] if joined_data else ''
+#     }
+
+#     return user_data
+
+
+# @router.get("/get_user_info", tags=["Users"])
+# async def get_user_info(token: str) -> dict:
+#     print("get user info log")
+#     # Verify the token and extract user email
+#     user = await verify_token_email(token)
+
+#     print(user)
+
+#     if not user:
+#         # Raise a 401 Unauthorized error
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Invalid or Expired token.",
+#             headers={"WWW-Authenticate": "Bearer"}
+#         )
+    
+#     # Query the database for user info
+#     user_info = await User.get(email=user.email).values(
+#         'id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at', 'is_verified'
+#     )
+    
+#     if not user_info:
+#         # If user_info is not found, you might want to return a different error status code, e.g., 404 Not Found
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="User not found."
+#         )
+
+#     return user_info
+
+    # return await user_pydantic.from_queryset_single(User.get(email=user.email))
+
+    # user_data = object()
 
     # add this for future purposes if you want to add user image
     # this include the user_img table
-    joined_data = False
+    # joined_data = False
     # joined_data = await User_Img.filter(user=the_user['id']).prefetch_related('user').order_by('-created_at').values('img_url', 'user__username', 'user__first_name', 'user__last_name', 'user__birth_date', 'user__email', 'user__phone', 'user__is_verified', 'user__created_at')
 
     # SQL = User_Img.filter(user=the_user['id']).prefetch_related('user').values('img_url', 'user__username', 'user__first_name', 'user__last_name', 'user__birth_date', 'user__email', 'user__phone', 'user__is_verified', 'user__created_at').sql()
@@ -141,66 +258,27 @@ async def check_user_credentials(token: str) -> dict:
     # if joined data is empty return data without user_img table
     # removed birthdate and username
     # if not joined_data:
-    user_only_data = await User.filter(email=user.email).values('id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at')
-    print(user_only_data[0]['email'])
+    # user_only_data = await User.filter(id=user['id']).values('id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at', 'is_verified')
+    # print(user_only_data[0]['email'])
 
-    # transform
-    user_data = {
-        # 'username': joined_data[0]['user__username'] if joined_data else user_only_data[0]['username'],
-        'id': joined_data[0]['user__id'] if joined_data else user_only_data[0]['id'],
-        'firstName': joined_data[0]['user__first_name'] if joined_data else user_only_data[0]['first_name'],
-        'lastName': joined_data[0]['user__last_name'] if joined_data else user_only_data[0]['last_name'],
-        'email': joined_data[0]['user__email'] if joined_data else user_only_data[0]['email'],
-        'phone': joined_data[0]['user__phone'] if joined_data else user_only_data[0]['phone'],
-        'job': joined_data[0]['user__job'] if joined_data else user_only_data[0]['job'],
-        # 'birth_date': joined_data[0]['user__birth_date'] if joined_data else user_only_data[0]['birth_date'],
-        # 'is_verified': joined_data[0]['user__is_verified'] if joined_data else user_only_data[0]['is_verified'],
-        'role': joined_data[0]['user__role'] if joined_data else user_only_data[0]['role'],
-        'created_at': joined_data[0]['user__created_at'] if joined_data else user_only_data[0]['created_at'],
-        'img_url': joined_data[0]['img_url'] if joined_data else ''
-    }
+    # # transform
+    # user_data = {
+    #     # 'username': joined_data[0]['user__username'] if joined_data else user_only_data[0]['username'],
+    #     'id': joined_data[0]['user__id'] if joined_data else user_only_data[0]['id'],
+    #     'firstName': joined_data[0]['user__first_name'] if joined_data else user_only_data[0]['first_name'],
+    #     'lastName': joined_data[0]['user__last_name'] if joined_data else user_only_data[0]['last_name'],
+    #     'email': joined_data[0]['user__email'] if joined_data else user_only_data[0]['email'],
+    #     'phone': joined_data[0]['user__phone'] if joined_data else user_only_data[0]['phone'],
+    #     'job': joined_data[0]['user__job'] if joined_data else user_only_data[0]['job'],
+    #     # 'birth_date': joined_data[0]['user__birth_date'] if joined_data else user_only_data[0]['birth_date'],
+    #     # 'is_verified': joined_data[0]['user__is_verified'] if joined_data else user_only_data[0]['is_verified'],
+    #     'role': joined_data[0]['user__role'] if joined_data else user_only_data[0]['role'],
+    #     'is_verified': joined_data[0]['user__is_verified'] if joined_data else user_only_data[0]['is_verified'],
+    #     'created_at': joined_data[0]['user__created_at'] if joined_data else user_only_data[0]['created_at'],
+    #     'img_url': joined_data[0]['img_url'] if joined_data else ''
+    # }
 
-    return user_data
-
-
-@router.get("/get_user_info/", tags=["Users"], status_code=status.HTTP_200_OK)
-async def get_user_credentials(email: str) -> dict:
-    user = await User.get(email=email).values('id')
-
-    user_data = object()
-
-    # add this for future purposes if you want to add user image
-    # this include the user_img table
-    joined_data = False
-    # joined_data = await User_Img.filter(user=the_user['id']).prefetch_related('user').order_by('-created_at').values('img_url', 'user__username', 'user__first_name', 'user__last_name', 'user__birth_date', 'user__email', 'user__phone', 'user__is_verified', 'user__created_at')
-
-    # SQL = User_Img.filter(user=the_user['id']).prefetch_related('user').values('img_url', 'user__username', 'user__first_name', 'user__last_name', 'user__birth_date', 'user__email', 'user__phone', 'user__is_verified', 'user__created_at').sql()
-    # print(SQL)
-
-    # if joined data is empty return data without user_img table
-    # removed birthdate and username
-    # if not joined_data:
-    user_only_data = await User.filter(id=user['id']).values('id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at', 'is_verified')
-    print(user_only_data[0]['email'])
-
-    # transform
-    user_data = {
-        # 'username': joined_data[0]['user__username'] if joined_data else user_only_data[0]['username'],
-        'id': joined_data[0]['user__id'] if joined_data else user_only_data[0]['id'],
-        'firstName': joined_data[0]['user__first_name'] if joined_data else user_only_data[0]['first_name'],
-        'lastName': joined_data[0]['user__last_name'] if joined_data else user_only_data[0]['last_name'],
-        'email': joined_data[0]['user__email'] if joined_data else user_only_data[0]['email'],
-        'phone': joined_data[0]['user__phone'] if joined_data else user_only_data[0]['phone'],
-        'job': joined_data[0]['user__job'] if joined_data else user_only_data[0]['job'],
-        # 'birth_date': joined_data[0]['user__birth_date'] if joined_data else user_only_data[0]['birth_date'],
-        # 'is_verified': joined_data[0]['user__is_verified'] if joined_data else user_only_data[0]['is_verified'],
-        'role': joined_data[0]['user__role'] if joined_data else user_only_data[0]['role'],
-        'is_verified': joined_data[0]['user__is_verified'] if joined_data else user_only_data[0]['is_verified'],
-        'created_at': joined_data[0]['user__created_at'] if joined_data else user_only_data[0]['created_at'],
-        'img_url': joined_data[0]['img_url'] if joined_data else ''
-    }
-
-    return user_data
+    # return user_data
 
 
 @router.post("/login", tags=["Users"], status_code=status.HTTP_200_OK)
@@ -215,6 +293,7 @@ async def login_user(login_info: CreateUserToken) -> dict:
         )
 
     return {'token': token, 'email': login_info.email, 'msg': "user logged in."}
+
 
 # update user info
 

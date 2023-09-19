@@ -32,28 +32,29 @@ from mangum import Mangum
 # get root logger
 # logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Employee Web System API", version="0.1.1",
-              description="Employee Web System API")
-
+app = FastAPI(title="Make you Smile System API", version="0.1.1",
+              description="Make You Smile Co. Ltd. System API")
 
 oauth_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # static file setup config
-# app.mount("/app/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # db
 initialize_db(app)
 
+# ROUTERS
+app.include_router(userRouter)
+app.include_router(staffRouter)
+app.include_router(japanAddressesRouter)
+
 
 origins = [
+    '*',
     # "http://localhost",
-    'http://localhost:8080',
-    'http://localhost:3000',
-    'http://ews-bucket.s3-website-ap-northeast-1.amazonaws.com/employee-web-system',
-    # 'https://ews-bucket.s3-website-ap-northeast-1.amazonaws.com',
-    # 'http://ews-bucket.s3.amazonaws.com',
-    'http://ews-bucket.s3-website-ap-northeast-1.amazonaws.com'
-    # 'http://ews-bucket.s3.ap-northeast-1.amazonaws.com',
+    # 'http://localhost:8080',
+    # 'http://localhost:3000',
+    # 'http://localhost:3000/employee-web-system'
 ]
 
 # middlewares
@@ -91,14 +92,8 @@ app.add_middleware(
 
 @app.get("/")
 async def main():
-    return {"message": "Hello World Kaisha System"}
-
-
-# ROUTERS
-app.include_router(userRouter)
-app.include_router(staffRouter)
-app.include_router(japanAddressesRouter)
-# app.include_router(employeeRouter)
+    return {"message": "MYS System API"}
 
 # aws lambda
-# handler = Mangum(app, lifespan="off")
+handler = Mangum(app)
+

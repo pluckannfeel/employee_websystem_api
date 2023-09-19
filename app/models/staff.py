@@ -47,5 +47,9 @@ class Staff(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     
 staff_pydantic = pydantic_model_creator(Staff, name='Staff', exclude=('created_at'))
+
+# create a pydantic that only takes id, english_name, japanese_name, staff_group, duty_type
+staffSelect_pydantic = pydantic_model_creator(Staff, name='StaffSelect', include=('id', 'english_name', 'japanese_name', 'staff_group', 'duty_type'))
+
 # staff_pydantic_in = pydantic_model_creator(Staff, name='StaffIn', exclude_readonly=True)
 # staff_pydantic_out = pydantic_model_creator(Staff, name='StaffOut', exclude=('created_at', 'user_id', 'disabled'))

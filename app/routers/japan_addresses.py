@@ -19,14 +19,14 @@ router = APIRouter(
 )
 
 # get all postal codes
-@router.get("/postal_codes", status_code=status.HTTP_200_OK)
+@router.get("/postal_codes")
 async def get_postal_codes():
     postal_codes = await JP_Addresses.filter(jp_prefecture__in=('東京都', '神奈川県')).order_by('jp_prefecture').distinct().values('postal_code', 'en_prefecture', 'jp_prefecture', 'en_municipality','jp_municipality', 'en_town', 'jp_town')
 
     return postal_codes
 
 # get all prefectures
-@router.get("/prefectures", status_code=status.HTTP_200_OK)
+@router.get("/prefectures")
 async def get_prefectures():
 
     # if language == 'en':
@@ -44,13 +44,13 @@ async def get_prefectures():
     
 
 # get all municipalities
-@router.get("/municipalities", status_code=status.HTTP_200_OK)
+@router.get("/municipalities")
 async def get_municipalities():
     municipalities = await JP_Addresses.filter(jp_prefecture__in=('東京都', '神奈川県')).order_by('jp_municipality').distinct().values('jp_prefecture', 'en_municipality','jp_municipality')
 
     return municipalities
 
 # get all towns
-@router.get("/towns", status_code=status.HTTP_200_OK)
+@router.get("/towns")
 async def get_towns(language: str):
     pass

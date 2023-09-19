@@ -115,12 +115,12 @@ def generate_s3_url(file_name, access_type):
         # expiration_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=)
         
         if access_type == 'read':
-            url = client.generate_presigned_url('get_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=20)
+            url = client.generate_presigned_url('get_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=3600)
             
             # cut off the query string
             url = url.split('?')[0]
         elif access_type == 'write':
-            url = client.generate_presigned_url('put_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=20)
+            url = client.generate_presigned_url('put_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=3600)
         
         # print("url: ", url)
         
