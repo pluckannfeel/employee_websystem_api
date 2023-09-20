@@ -321,7 +321,7 @@ async def generate_contracts(staff_id: str):
     zipf = zipfiles(pdf, f'files_{staff_id}')
 
     # delete pdf 
-    os.remove(pdf)
+    os.remove(pdf[0])
     
     return zipf
     
