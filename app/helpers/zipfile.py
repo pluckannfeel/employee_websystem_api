@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 zip_subdir = ""
 
 def zipfiles(filenames, zip_name):
-    print(filenames)
+    # print(filenames)
     zip_io = BytesIO()
     with zipfile.ZipFile(zip_io, mode='w', compression=zipfile.ZIP_DEFLATED) as temp_zip:
         for fpath in filenames:

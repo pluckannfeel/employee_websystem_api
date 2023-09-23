@@ -7,8 +7,8 @@ import datetime
 
 load_dotenv()
 
-access_key = os.getenv("AWS_ACCESS_KEY_ID")
-secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+access_key = os.environ["AWS_ACCESS_KEYID"]
+secret_access_key = os.environ["AWS_SECRET_ACCESSKEY"]
 
 client = boto3.client('s3',
                       aws_access_key_id=access_key,
@@ -17,7 +17,7 @@ client = boto3.client('s3',
 # file upload
 upload_path = get_directory_path() +  '\\uploads'
 
-bucket_name = os.getenv("AWS_STORAGE_BUCKET_NAME")
+bucket_name = os.environ["AWS_STORAGE_BUCKET_NAME"]
 
 # def upload_file_to_s3(file_object, app_type):
 #     if app_type == 'professional':
@@ -111,19 +111,31 @@ def upload_file_to_s3(file_object, new_file_name):
 
 #generate s3 bucket url
 def generate_s3_url(file_name, access_type):
+    print(f"file_name :{file_name}")
     try:
         # expiration_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=)
         
         if access_type == 'read':
-            url = client.generate_presigned_url('get_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=3600)
+            url = client.generate_presigned_url('get_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=60)
             
             # cut off the query string
             url = url.split('?')[0]
         elif access_type == 'write':
-            url = client.generate_presigned_url('put_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=3600)
+            url = client.generate_presigned_url('put_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=60)
+            
         
         # print("url: ", url)
         
         return url
     except NoCredentialsError:
         print("Credentials not available")
+
+
+def is_file_exists(file_path):
+    try:
+        response = client.head_object(Bucket=bucket_name, Key=file_path)
+        print(response)
+        return True
+    except ClientError as e:
+        return False
+    

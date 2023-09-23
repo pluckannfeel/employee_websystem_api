@@ -6,6 +6,7 @@ from typing import List, Type
 
 # fast api
 from fastapi import APIRouter, status, HTTPException, File, Form, UploadFile
+from fastapi.responses import JSONResponse
 
 # models
 from app.models.user import User
@@ -14,17 +15,22 @@ from app.models.staff import Staff, staff_pydantic, staffSelect_pydantic
 # helpers 
 from app.helpers.zipfile import zipfiles
 from app.helpers.generate_pdf import fill_pdf_contract
+from app.helpers.onedrive import read_from_onedrive, upload_file_to_onedrive
 
 # s3
-from app.helpers.s3_file_upload import upload_file_to_s3, generate_s3_url, upload_image_to_s3
+from app.helpers.s3_file_upload import upload_file_to_s3, generate_s3_url, upload_image_to_s3, is_file_exists
 
 #schema
 from app.models.staff_schema import StaffLicense, LicenseData
 
+# one drive
+# from app.helpers.onedrive import get_access_token
+# import httpx
 
 s3_upload_folder = 'uploads/staff/img/'
 
 s3_license_upload_folder = 'uploads/staff/pdf/'
+s3_contracts_folder = 'uploads/staff/contracts/'
 
 router = APIRouter(
     prefix="/staff",
@@ -311,23 +317,29 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
 @router.get('/generate')
 async def generate_contracts(staff_id: str):
-     # contract_data = await Contract.filter(id=contract_id).select_related('company').values('id', 'worker_name', 'agency_name', 'agency_address', 'agency_rep_name', 'agency_rep_position', 'site_employment', 'contract_duration', 'contract_terms', 'bonus', 'salary_increase', 'work_start_time', 'work_end_time', 'work_rest', 'work_working_days', 'work_days_off', 'work_leave', 'work_other_leave', 'utilities', 'housing_accomodation', 'housing_cost', 'job_title', 'job_description', 'job_duties', 'job_criteria_degree', 'job_criteria_jlpt_level', 'job_criteria_year_exp', 'job_criteria_other', 'job_basic_salary', 'job_total_deductions', 'job_income_tax', 'job_social_insurance', 'job_utilities', 'job_accomodation', 'job_net_salary', 'benefits_housing', 'benefits_utilities', 'benefits_transportation', 'benefits_other', 'company_id', company_name='company__name', company_rep_name='company__rep_name',company_rep_position='company__rep_position', company_address='company__address', company_contact_number='company__contact_number')
-        # get staff name by staff id
     staff = await Staff.get(id=staff_id).values('english_name')
-    pdf = fill_pdf_contract(staff)
+
+    staff_name = staff['english_name']
+    now = datetime.now()
+    formatted_now = now.strftime("_%Y")
+
+    contract_file_name = staff_name.replace(" ", "") + formatted_now + '.pdf'
+
+    # check aws s3 bucket if this file exist. 
+    # if exist, return the file url
+    # if not exist, create the file and upload to s3 bucket
+
+    # check if file exist
+    file_path = s3_contracts_folder + contract_file_name
+
+    if is_file_exists(file_path):
+        # print("file exists")
+        return generate_s3_url(file_path, 'read')
+    else:
+        pdf = fill_pdf_contract(staff)
 
     # open the pdf file in binary mode
     # with open(pdf, 'rb') as file:
-    zipf = zipfiles(pdf, f'files_{staff_id}')
-
-    # delete pdf 
-    os.remove(pdf[0])
+    # zipf = zipfiles(pdf, f'files_{staff_id}')
     
-    return zipf
-    
-    # try:
-       
-    # except Exception as e:
-    #     print("error while generating contract: ", e)
-        
-    # return {'data': {}, 'msg': 'no data found.'}
+    return pdf[0]

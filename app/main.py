@@ -1,15 +1,10 @@
-import logging
-import random
-import string
-import time
-from datetime import datetime
-
 # FastAPI
 from tokenize import String
 from urllib.request import Request
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
+import requests
 
 # cors headers
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +21,10 @@ from app.routers.staff import router as staffRouter
 from app.routers.japan_addresses import router as japanAddressesRouter
 
 from mangum import Mangum
+
+# onedrive
+from app.helpers.onedrive import get_access_token
+# import httpx
 
 # setup loggers
 # logging.config.fileConfig('logging.conf', disable_existing_loggers=False)
@@ -88,6 +87,61 @@ app.add_middleware(
 #     file.write(write_log + '\n')
 
 #     return response
+
+# @app.get("/onedrive")
+# async def test_onedrive():
+#     access_token = get_access_token()
+
+#     headers = {
+#         'Authorization': f'Bearer {access_token}'
+#     }
+
+#     #TEST Folder ID
+#     test = "01DNUDTEC6VHUATQYSURAIXZVT5M34KPIK"
+
+#     # Example: List OneDrive files
+#     endpoint = f'https://graph.microsoft.com/v1.0/users/adf679a5-6a9f-40ba-ba57-ccfacd751745/drive/items/{test}/children/'
+    
+#     try:
+#         async with httpx.AsyncClient() as client:
+
+#             response = await client.get(endpoint, headers=headers)
+            
+#             files = response.json()
+#             return files
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=e)
+    
+# @app.post("/upload_to_onedrive")
+# async def upload_file(file: UploadFile = File(...)):
+#     access_token = get_access_token()
+
+#     headers = {
+#         'Authorization': f'Bearer {access_token}'
+#     }
+
+#     #TEST Folder ID
+#     folder = "01DNUDTEC6VHUATQYSURAIXZVT5M34KPIK"
+
+#      # Read the content of the uploaded file
+#     file_content = await file.read()
+
+#     # Define the endpoint to upload the file to the specified folder
+#     endpoint = f'https://graph.microsoft.com/v1.0/users/adf679a5-6a9f-40ba-ba57-ccfacd751745/drive/items/{folder}/children/{file.filename}/content'
+
+#     # async with httpx.AsyncClient() as client:
+#     #     # Upload the file content
+#     #     response = await client.put(endpoint, headers=headers, data=file_content)
+#     #     if response.status_code == 201:
+#     #         return {"message": "File uploaded successfully"}
+#     #     else:
+#     #         raise HTTPException(status_code=response.status_code, detail="OneDrive API request failed")
+        
+#     response = requests.put(endpoint, headers=headers, data=file_content)
+#     if response.status_code == 201:
+#         return {"message": "File uploaded successfully"}
+#     else:
+#         raise HTTPException(status_code=response.status_code, detail="OneDrive API request failed")
 
 
 @app.get("/")
