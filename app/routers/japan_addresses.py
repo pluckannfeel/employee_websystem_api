@@ -21,7 +21,7 @@ router = APIRouter(
 # get all postal codes
 @router.get("/postal_codes")
 async def get_postal_codes():
-    postal_codes = await JP_Addresses.filter(jp_prefecture__in=('東京都', '神奈川県')).order_by('jp_prefecture').distinct().values('postal_code', 'en_prefecture', 'jp_prefecture', 'en_municipality','jp_municipality', 'en_town', 'jp_town')
+    postal_codes = await JP_Addresses.filter(jp_prefecture__in=('東京都', '神奈川県', '千葉県', '静岡県')).order_by('jp_prefecture').distinct().values('postal_code', 'en_prefecture', 'jp_prefecture', 'en_municipality','jp_municipality', 'en_town', 'jp_town')
 
     return postal_codes
 
@@ -38,7 +38,7 @@ async def get_prefectures():
     # else:
     #     prefectures = []
 
-    prefectures = await JP_Addresses.filter(jp_prefecture__in=('東京都', '神奈川県')).order_by('jp_prefecture').distinct().values('en_prefecture','jp_prefecture')
+    prefectures = await JP_Addresses.filter(jp_prefecture__in=('東京都', '神奈川県', '千葉県', '静岡県')).order_by('jp_prefecture').distinct().values('en_prefecture','jp_prefecture')
 
     return prefectures
     
@@ -46,7 +46,7 @@ async def get_prefectures():
 # get all municipalities
 @router.get("/municipalities")
 async def get_municipalities():
-    municipalities = await JP_Addresses.filter(jp_prefecture__in=('東京都', '神奈川県')).order_by('jp_municipality').distinct().values('jp_prefecture', 'en_municipality','jp_municipality')
+    municipalities = await JP_Addresses.filter(jp_prefecture__in=('東京都', '神奈川県', '千葉県', '静岡県')).order_by('jp_municipality').distinct().values('jp_prefecture', 'en_municipality','jp_municipality')
 
     return municipalities
 

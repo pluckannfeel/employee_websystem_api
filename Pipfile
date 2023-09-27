@@ -26,6 +26,9 @@ msal = "*"
 oauthlib = "*"
 httpx = "*"
 authlib = "*"
+pandas = "*"
+openpyxl = "*"
+xlsxwriter = "*"
 
 [dev-packages]
 

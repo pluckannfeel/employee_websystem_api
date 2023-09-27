@@ -13,6 +13,7 @@ class Staff(Model):
     # added on sep 6
     japanese_name = fields.CharField(max_length=128, null=True)
     english_name = fields.CharField(max_length=128, null=True)
+    nickname = fields.CharField(max_length=128, null=True)
     nationality = fields.CharField(max_length=128, null=True)
     gender = fields.CharField(max_length=128, null=True)
     job_position = fields.CharField(max_length=128, null=True) 
@@ -27,7 +28,8 @@ class Staff(Model):
     town = fields.CharField(max_length=128, null=True)
     building = fields.CharField(max_length=128, null=True)
     phone_number = fields.CharField(max_length=128, null=True) #職員電話番号
-    email = fields.CharField(max_length=128, null=True)
+    personal_email = fields.CharField(max_length=128, null=True)
+    work_email = fields.CharField(max_length=128, null=True)
     koyou_keitai = fields.CharField(max_length=128, null=True) #雇用形態 Employment status
     zaishoku_joukyou = fields.CharField(max_length=128, null=True) #在職状況 Employment status
     licenses = fields.TextField(null=True) 

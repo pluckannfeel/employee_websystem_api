@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
 import json
 import os
+import pandas as pd
 
 from typing import List, Type
 
 # fast api
-from fastapi import APIRouter, status, HTTPException, File, Form, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, status, HTTPException, File, Form, UploadFile, Response
+from fastapi.responses import JSONResponse, FileResponse
 
 # models
 from app.models.user import User
@@ -22,6 +23,8 @@ from app.helpers.s3_file_upload import upload_file_to_s3, generate_s3_url, uploa
 
 #schema
 from app.models.staff_schema import StaffLicense, LicenseData
+
+from tempfile import NamedTemporaryFile
 
 # one drive
 # from app.helpers.onedrive import get_access_token
@@ -60,7 +63,7 @@ async def get_staff(staff_group: str):
 
     # get all staff and just filter with staff group
     if staff_group == 'staff' or staff_group  == 'スタッフ':
-        staff = Staff.filter(disabled=False, staff_group='スタッフ').all()
+        staff = Staff.filter(disabled=False, staff_group='スタッフ').order_by('zaishoku_joukyou').all()
     elif staff_group == 'user' or staff_group == '利用者':
         staff = Staff.filter(disabled=False, staff_group='利用者').all()
 
@@ -149,6 +152,8 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
     if licenses is not None:
     # convert licenses to json
         new_staff.licenses = json.loads(new_staff.licenses)
+    else:
+        new_staff.licenses = []
 
     return new_staff
 
@@ -267,6 +272,8 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
     if licenses is not None:
     # convert licenses to json
         updated_staff.licenses = json.loads(updated_staff.licenses)
+    else:
+        updated_staff.licenses = []
 
     return updated_staff
 
@@ -343,3 +350,56 @@ async def generate_contracts(staff_id: str):
     # zipf = zipfiles(pdf, f'files_{staff_id}')
     
     return pdf[0]
+
+# @router.get('/download')
+# async def download_staff_list():
+#     # get all staff which is ordered by  zaishoku_joukyou
+#     staff = await Staff.filter(disabled=False).order_by('staff_code','zaishoku_joukyou').values('affiliation', 'staff_code', 'english_name', 'japanese_name', 'nationality', 'join_date',
+#                                                                                     'leave_date', 'postal_code', 'prefecture', 'municipality', 'town',
+#                                                                                     'building', 'phone_number', 'email', 'koyou_keitai', 'zaishoku_joukyou',)
+
+#     df = pd.DataFrame(staff)
+
+#     headers = ["所属", "社員番号", "NAME", "職員名", "国籍 ", "入社年月日", "退社年月日", "郵便番号",
+#                 "都道府県", "市区町村", "町名以下", "建物名", "職員電話番号", "職員Eメールアドレス", "雇用形態", "在職状況"]
+
+#     csv_str = df.to_csv(index=False, header=headers)
+
+#     # Set response headers for CSV download
+#     response = Response(content=csv_str, media_type="text/csv; charset=utf-8")
+#     response.headers["Content-Disposition"] = "attachment; filename=staff.csv"
+
+#     return response
+
+@router.get('/download')
+async def download_staff_list():
+    # get all staff which is ordered by zaishoku_joukyou
+    staff = await Staff.filter(disabled=False).order_by('staff_code','zaishoku_joukyou').values(
+        'affiliation', 'staff_code', 'english_name', 'japanese_name', 'nickname', 'nationality', 'join_date',
+        'leave_date', 'postal_code', 'prefecture', 'municipality', 'town',
+        'building', 'phone_number', 'email', 'koyou_keitai', 'zaishoku_joukyou',
+    )
+
+    df = pd.DataFrame(staff)
+
+    headers = ["所属", "社員番号", "NAME", "職員名", "ニックネーム", "国籍 ", "入社年月日", "退社年月日", "郵便番号",
+               "都道府県", "市区町村", "町名以下", "建物名", "職員電話番号", "職員Eメールアドレス", "雇用形態", "在職状況"]
+
+    # Create a temporary Excel file
+    with NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
+        excel_writer = pd.ExcelWriter(tmp_file.name, engine='xlsxwriter')
+        df.to_excel(excel_writer, index=False, header=headers)
+        excel_writer.close()  # Close the ExcelWriter to save the Excel file
+
+    # Return the Excel file as a response
+    response = FileResponse(tmp_file.name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response.headers["Content-Disposition"] = "attachment; filename=staff.xlsx"
+
+    return response
+
+# Define a function to apply row coloring
+def highlight_rows(row):
+    if row["zaishoku_joukyou"] == "退社済":
+        return ['background-color: gray'] * len(row)
+    else:
+        return [''] * len(row)
