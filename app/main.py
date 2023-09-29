@@ -18,6 +18,7 @@ from app.db.init import initialize_db
 from app.routers.users import router as userRouter
 from app.routers.employees import router as employeeRouter
 from app.routers.staff import router as staffRouter
+from app.routers.patients import router as patientRouter
 from app.routers.japan_addresses import router as japanAddressesRouter
 
 from mangum import Mangum
@@ -43,8 +44,9 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 initialize_db(app)
 
 # ROUTERS
-app.include_router(userRouter)
 app.include_router(staffRouter)
+app.include_router(patientRouter)
+app.include_router(userRouter)
 app.include_router(japanAddressesRouter)
 
 

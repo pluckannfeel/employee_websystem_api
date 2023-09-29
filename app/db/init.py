@@ -20,6 +20,7 @@ def initialize_db(app):
                 'app.models.user',
                 'app.models.staff',
                 'app.models.japan_addresses',
+                'app.models.patient',
                 # 'app.models.employee',
                 # 'app.models.employee_immigration_details',
                 # 'app.models.employee_qualifications_licenses',

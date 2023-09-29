@@ -62,10 +62,10 @@ async def get_staff(staff_group: str):
     #                             user_id=user['id']).all()
 
     # get all staff and just filter with staff group
-    if staff_group == 'staff' or staff_group  == 'スタッフ':
-        staff = Staff.filter(disabled=False, staff_group='スタッフ').order_by('zaishoku_joukyou').all()
-    elif staff_group == 'user' or staff_group == '利用者':
-        staff = Staff.filter(disabled=False, staff_group='利用者').all()
+    # if staff_group == 'staff' or staff_group  == 'スタッフ':
+    staff = Staff.filter(disabled=False).order_by('zaishoku_joukyou').all()
+    # elif staff_group == 'user' or staff_group == '利用者':
+    #     staff = Staff.filter(disabled=False, staff_group='利用者').all()
 
     staff_list = await staff_pydantic.from_queryset(staff)
 
@@ -81,7 +81,7 @@ async def get_staff(staff_group: str):
 async def get_staff_select():
     
     # same as staff but only take id, english_name, japanese_name, staff_group, duty_type
-    staff = Staff.filter(disabled=False).all()
+    staff = Staff.filter(disabled=False).exclude(zaishoku_joukyou="退社済").all()
 
     staff_list = await staffSelect_pydantic.from_queryset(staff)
 
@@ -374,21 +374,52 @@ async def generate_contracts(staff_id: str):
 @router.get('/download')
 async def download_staff_list():
     # get all staff which is ordered by zaishoku_joukyou
-    staff = await Staff.filter(disabled=False).order_by('staff_code','zaishoku_joukyou').values(
+    staff = await Staff.filter(disabled=False).order_by('zaishoku_joukyou').values(
         'affiliation', 'staff_code', 'english_name', 'japanese_name', 'nickname', 'nationality', 'join_date',
         'leave_date', 'postal_code', 'prefecture', 'municipality', 'town',
-        'building', 'phone_number', 'email', 'koyou_keitai', 'zaishoku_joukyou',
+        'building', 'phone_number', 'personal_email', 'work_email', 'koyou_keitai', 'zaishoku_joukyou',
     )
 
     df = pd.DataFrame(staff)
 
+    # headers = ["affiliation", "staff_code", "english_name", "japanese_name", "nickname", "nationality", "join_date",
+    #            "leave_date", "postal_code", "prefecture", "municipality", "town",
+    #            "building", "phone_number", "personal_email", "work_email", "koyou_keitai", "zaishoku_joukyou"]
+
+    # change column headers
     headers = ["所属", "社員番号", "NAME", "職員名", "ニックネーム", "国籍 ", "入社年月日", "退社年月日", "郵便番号",
-               "都道府県", "市区町村", "町名以下", "建物名", "職員電話番号", "職員Eメールアドレス", "雇用形態", "在職状況"]
+            "都道府県", "市区町村", "町名以下", "建物名", "職員電話番号", "個人Eメールアドレス", "職員Eメールアドレス", "雇用形態", "在職状況"]
 
     # Create a temporary Excel file
     with NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
         excel_writer = pd.ExcelWriter(tmp_file.name, engine='xlsxwriter')
         df.to_excel(excel_writer, index=False, header=headers)
+
+        # Get the xlsxwriter workbook and worksheet objects
+        workbook = excel_writer.book
+        worksheet = excel_writer.sheets['Sheet1']  # You may need to adjust the sheet name
+
+        # Adjust column widths based on content
+        # for i, col in enumerate(headers):
+        #     column_len = max(df[col].astype(str).str.len().max(), len(col) + 2)  # +2 for padding
+        #     worksheet.set_column(i, i, column_len)
+
+        # Adjust column widths based on content
+        for i in range(len(headers)):
+            max_len = df.iloc[:, i].astype(str).str.len().max()
+            column_len = max(max_len, len(headers[i]) + 2)  # +2 for padding
+            worksheet.set_column(i, i, column_len)
+
+        #FFD580
+        format_orange = workbook.add_format({'bg_color': '#FFD580'})  # Red background
+        worksheet.conditional_format(
+            1,  # Starting row (assuming header is in row 1)
+            headers.index('在職状況'),  # Column index of '雇用形態'
+            df.shape[0],  # Number of rows
+            headers.index('在職状況'),  # Column index of '雇用形態'
+            {'type': 'text', 'criteria': 'containing', 'value': '退社済', 'format': format_orange}
+        )
+
         excel_writer.close()  # Close the ExcelWriter to save the Excel file
 
     # Return the Excel file as a response
