@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, FileResponse
 # models
 from app.models.user import User
 from app.models.staff import Staff, staff_pydantic, staffSelect_pydantic
+from app.models.staff_workschedule import Staff_WorkSchedule, staff_workschedule_pydantic
 
 # helpers 
 from app.helpers.zipfile import zipfiles
@@ -157,57 +158,6 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
     return new_staff
 
-    # return {}
-
-
-# @router.post("/add_staff", status_code=status.HTTP_201_CREATED)
-# async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = File(...), licenses: List[UploadFile] = File(...)):
-#     staff_data = json.loads(staff_json)
-
-#     print(staff_data)
-
-#     licenses_data = licenses.licenses
-
-#     for license in licenses_data:
-#         print(license.file)
-
-#     # print(licenses)
-
-#     return {}
-
-    # is_file_image = staff_image.content_type.startswith('image/')
-
-    # if not is_file_image:
-    #     raise HTTPException(status_code=400, detail='File uploaded is not an image')
-    
-    # now = datetime.now()
-    # image_name = staff_data['english_name'].split(
-    #     ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + staff_image.filename.split('.')[-1]
-    
-    # # s3_img_url = s3_upload_path + image_name
-    # s3_img_path = s3_upload_folder + image_name
-
-    # # upload to s3 bucket
-    # uploaded_file = upload_image_to_s3(staff_image, image_name)
-
-    # print("uploaded: ", uploaded_file)
-
-    # s3_read_url = generate_s3_url(s3_img_path, 'read')
-
-    # # append s3_read_url to employee_data
-    # staff_data['img_url'] = s3_read_url
-
-    # print("s3_read_url: ", s3_read_url)
-
-    # # user = await User.get(id=employee_data['user_id']).values('id')
-
-    # # create staff
-    # staff = await Staff.create(**staff_data)
-
-    # new_staff = await staff_pydantic.from_tortoise_orm(staff)
-
-    # return new_staff
-
 @router.put("/update_staff")
 async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None)):
     staff_data = json.loads(staff_json)
@@ -277,50 +227,6 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
     return updated_staff
 
-# @router.put("/update_staff", status_code=status.HTTP_201_CREATED)
-# async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[StaffLicense] = Form(...) ):
-#     staff_data = json.loads(staff_json)
-
-#     print(staff_data)
-
-#     print(licenses)
-    # check if there is an image file
-    # if staff_image is not None:
-    #     is_file_image = staff_image.content_type.startswith('image/')
-
-    #     if not is_file_image:
-    #         raise HTTPException(status_code=400, detail='File uploaded is not an image')
-        
-    #     now = datetime.now()
-    #     image_name = staff_data['english_name'].split(
-    #         ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + staff_image.filename.split('.')[-1]
-        
-    #     # s3_img_url = s3_upload_path + image_name
-    #     s3_img_path = s3_upload_folder + image_name
-
-    #     # upload to s3 bucket
-    #     uploaded_file = upload_image_to_s3(staff_image, image_name)
-
-    #     print("uploaded: ", uploaded_file)
-
-    #     s3_read_url = generate_s3_url(s3_img_path, 'read')
-
-    #     # append s3_read_url to employee_data
-    #     staff_data['img_url'] = s3_read_url
-
-    #     print("s3_read_url: ", s3_read_url)
-
-    # staff_data_copy = staff_data.copy()
-    
-    # staff_data_copy.pop('id')
-
-    # # update staff
-    # await Staff.filter(id=staff_data['id']).update(**staff_data_copy)
-
-    # updated_staff = await staff_pydantic.from_queryset_single(Staff.get(id=staff_data['id']))
-
-    # return updated_staff
-
 
 @router.get('/generate')
 async def generate_contracts(staff_id: str):
@@ -351,6 +257,7 @@ async def generate_contracts(staff_id: str):
     
     return pdf[0]
 
+# for csv
 # @router.get('/download')
 # async def download_staff_list():
 #     # get all staff which is ordered by  zaishoku_joukyou
@@ -434,3 +341,31 @@ def highlight_rows(row):
         return ['background-color: gray'] * len(row)
     else:
         return [''] * len(row)
+    
+
+
+@router.get("/workschedule_list")
+# async def get_staff(user_email_token: str, staff_group: str):
+async def get_all_schedule():
+        # add staffs japanese name and english name in the values
+   return await Staff_WorkSchedule.all().values()
+
+
+@router.post('/add_workschedule')
+async def create_workschedule(staff_workschedule_json: str = Form(...)):
+    work_schedule_data = json.loads(staff_workschedule_json)
+
+    staff_data = work_schedule_data.pop('staff')
+    #get id from staff_data 
+    staff_id = staff_data['id']
+
+    # add staff_id on work_schedule_data
+    work_schedule_data['staff_id'] = staff_id
+
+    print(work_schedule_data)
+
+    schedule = await Staff_WorkSchedule.create(**work_schedule_data)
+
+    new_schedule = await staff_workschedule_pydantic.from_tortoise_orm(schedule)
+
+    return new_schedule
