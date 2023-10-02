@@ -26,7 +26,7 @@ router = APIRouter(
 async def get_patients():
     # you can filter by affiliation later on
     # get all patient 
-    return await Patient.all().values()
+    return await Patient.filter(data_disabled=False).all().values()
 
 @router.post("/add_patient")
 async def create_patient(patient_json: str = Form(...)):
@@ -54,10 +54,22 @@ async def update_patient(patient_json: str = Form(...)):
 
     return updated_patient
 
+@router.put("/delete_patients")
+async def delete_patients(patient_json: str = Form(...)):
+    patient_data = json.loads(patient_json)
+
+    # update all employees in the list employees's disabled to true
+    await Patient.filter(id__in=patient_data['patients']).update(data_disabled=True)
+    # await Employee.filter(id__in=employe  es['ids']).delete()
+
+    return patient_data['patients']
+
+    # return {'msg': 'Employees deleted successfully.'}
+
 @router.get('/download')
 async def download_patient_list():
     # get all patient values but exclude id and created_at
-    patient = await Patient.all().values("name_kanji", "name_kana", "birth_date", "gender", "postal_code", "prefecture",
+    patient = await Patient.all().values("name_kanji", "name_kana", "birth_date", "age", "gender", "disable_support_category", "beneficiary_number", "postal_code", "prefecture",
                                     "municipality", "town", "building", "phone_number", "telephone_number", "billing_method",
                                       "billing_address", "billing_postal_code", "patient_status", "remarks")
 
@@ -68,7 +80,7 @@ async def download_patient_list():
     #            "building", "phone_number", "personal_email", "work_email", "koyou_keitai", "zaishoku_joukyou"]
 
     # change column headers
-    headers = ["利用者名", "利用者カナ", "利用者生年月日", "性別", "郵便番号", "都道府県 ", "市区町村", "町名以下",
+    headers = ["利用者名", "利用者カナ", "利用者生年月日", "年齢", "性別", "障害支援区分", "受給者番号", "郵便番号", "都道府県 ", "市区町村", "町名以下",
             "建物名", "利用者電話番号", "利用者携帯電話番号", "請求方法", "請求送付先", "請求先郵便番号", "利用者状態", "備考"]
 
     # Create a temporary Excel file

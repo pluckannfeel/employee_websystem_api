@@ -64,7 +64,8 @@ async def get_staff(staff_group: str):
 
     # get all staff and just filter with staff group
     # if staff_group == 'staff' or staff_group  == 'スタッフ':
-    staff = Staff.filter(disabled=False).order_by('zaishoku_joukyou').all()
+    # staff = Staff.filter(disabled=False).order_by('zaishoku_joukyou').all()
+    staff = Staff.filter(disabled=False, zaishoku_joukyou__not="退社済").order_by('staff_code').all()
     # elif staff_group == 'user' or staff_group == '利用者':
     #     staff = Staff.filter(disabled=False, staff_group='利用者').all()
 
@@ -227,6 +228,18 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
     return updated_staff
 
+@router.put("/delete_staff")
+async def delete_staff(staff_json: str = Form(...)):
+    staff_data = json.loads(staff_json)
+
+    # update all employees in the list employees's disabled to true
+    await Staff.filter(id__in=staff_data['staff']).update(disabled=True)
+    # await Employee.filter(id__in=employe  es['ids']).delete()
+
+    return staff_data['staff']
+
+    # return {'msg': 'Employees deleted successfully.'}
+
 
 @router.get('/generate')
 async def generate_contracts(staff_id: str):
@@ -281,7 +294,7 @@ async def generate_contracts(staff_id: str):
 @router.get('/download')
 async def download_staff_list():
     # get all staff which is ordered by zaishoku_joukyou
-    staff = await Staff.filter(disabled=False).order_by('zaishoku_joukyou').values(
+    staff = await Staff.filter(disabled=False).order_by('staff_code').values(
         'affiliation', 'staff_code', 'english_name', 'japanese_name', 'nickname', 'nationality', 'join_date',
         'leave_date', 'postal_code', 'prefecture', 'municipality', 'town',
         'building', 'phone_number', 'personal_email', 'work_email', 'koyou_keitai', 'zaishoku_joukyou',
