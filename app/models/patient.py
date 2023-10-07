@@ -26,6 +26,8 @@ class Patient(Model):
     patient_status = fields.CharField(max_length=128, null=True) #利用者状況
     remarks = fields.TextField(null=True)
     data_disabled = fields.BooleanField(null=False, default=False) # instead of deleting the record, we just set this to true
+    images = fields.TextField(null=True)
+    instructions = fields.TextField(null=True) # 指示事項  # note # file
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:

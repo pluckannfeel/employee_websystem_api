@@ -84,8 +84,9 @@ def upload_image_to_s3(imageFile, new_image_name):
         # print(contents)  # Handle file contents as desired
         return {"filename": imageFile.filename}
     
-def upload_file_to_s3(file_object, new_file_name):
-    object_name = f'uploads/staff/pdf/{new_file_name}'
+def upload_file_to_s3(file_object, new_file_name, folder_path):
+    # slash is not needed
+    object_name = f'{folder_path}{new_file_name}'
     temp = NamedTemporaryFile(delete=False)
     try:
         try:
@@ -107,6 +108,8 @@ def upload_file_to_s3(file_object, new_file_name):
         os.remove(temp.name)
         # print(contents)  # Handle file contents as desired
         return {"filename": file_object.filename}
+    
+
 
 
 #generate s3 bucket url

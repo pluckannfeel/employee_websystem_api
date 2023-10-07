@@ -105,7 +105,7 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         # create a new filename string with file name plus timestamp
             new_file_name = file.filename.split('.')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
             # upload to s3 bucket
-            uploaded_file = upload_file_to_s3(file, new_file_name)
+            uploaded_file = upload_file_to_s3(file, new_file_name, s3_license_upload_folder)
 
             s3_file_path = s3_license_upload_folder + new_file_name
             
@@ -172,7 +172,7 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         # create a new filename string with file name plus timestamp
             new_file_name = file.filename.split('.')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
             # upload to s3 bucket
-            uploaded_file = upload_file_to_s3(file, new_file_name)
+            uploaded_file = upload_file_to_s3(file, new_file_name, s3_license_upload_folder)
 
             s3_file_path = s3_license_upload_folder + new_file_name
             
