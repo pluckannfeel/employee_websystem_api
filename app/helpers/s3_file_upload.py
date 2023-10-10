@@ -48,8 +48,8 @@ bucket_name = os.environ["AWS_STORAGE_BUCKET_NAME"]
 #         # print(contents)  # Handle file contents as desired
 #         return {"filename": file_object.filename}
 
-def upload_image_to_s3(imageFile, new_image_name):    
-    object_name = f'uploads/staff/img/{new_image_name}' 
+def upload_image_to_s3(imageFile, new_image_name, folder_path):    
+    object_name = f'uploads/staff/{folder_path}/{new_image_name}' 
     temp = NamedTemporaryFile(delete=False)
     try:
         try:

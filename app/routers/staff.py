@@ -31,7 +31,9 @@ from tempfile import NamedTemporaryFile
 # from app.helpers.onedrive import get_access_token
 # import httpx
 
-s3_upload_folder = 'uploads/staff/img/'
+s3_staffimage_upload_folder = 'uploads/staff/img/'
+
+s3_staffbankcard_upload_folder = 'uploads/staff/bank_img/'
 
 s3_license_upload_folder = 'uploads/staff/pdf/'
 s3_contracts_folder = 'uploads/staff/contracts/'
@@ -71,9 +73,13 @@ async def get_staff(staff_group: str):
 
     staff_list = await staff_pydantic.from_queryset(staff)
 
-    # convert licenses to json
+    # convert licenses and bank_card_iamges to json
+    # check first if there is licenses or bank_card_images
     for staff in staff_list:
-        staff.licenses = json.loads(staff.licenses)
+        if staff.licenses is not None:
+            staff.licenses = json.loads(staff.licenses)
+        if staff.bank_card_images is not None:
+            staff.bank_card_images = json.loads(staff.bank_card_images)
         # print(staff.licenses)
 
 
@@ -92,7 +98,7 @@ async def get_staff_select():
     return staff_list
 
 @router.post("/add_staff")
-async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = File(...), licenses: List[UploadFile] = File(None)):
+async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None), bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None)):
     staff_data = json.loads(staff_json)
 
     # file_names = []
@@ -117,32 +123,36 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
         staff_data['licenses'] = json.dumps(staff_data['licenses'])
     
-
-    is_file_image = staff_image.content_type.startswith('image/')
-
-    if not is_file_image:
-        raise HTTPException(status_code=400, detail='File uploaded is not an image')
     
-    
-    image_name = staff_data['english_name'].split(
+    if staff_image is not None:
+        image_name = staff_data['english_name'].split(
         ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + staff_image.filename.split('.')[-1]
-    
-    # s3_img_url = s3_upload_path + image_name
-    s3_img_path = s3_upload_folder + image_name
+        # s3_img_url = s3_upload_path + image_name
+        s3_img_path = s3_staffimage_upload_folder + image_name
+        # upload to s3 bucket
+        uploaded_file = upload_image_to_s3(staff_image, image_name, "img")
+        s3_read_url = generate_s3_url(s3_img_path, 'read')
+        # append s3_read_url to employee_data
+        staff_data['img_url'] = s3_read_url
 
-    # upload to s3 bucket
-    uploaded_file = upload_image_to_s3(staff_image, image_name)
+    if bank_card_front or bank_card_back is not None:
+        bank_card_front_name = now.strftime("_front_%Y%m%d_%H%M%S") + '.' + bank_card_front.filename.split('.')[-1]
+        bank_card_back_name = now.strftime("_back_%Y%m%d_%H%M%S") + '.' + bank_card_back.filename.split('.')[-1]
+        
+        s3_bankimage_path_front = s3_staffbankcard_upload_folder + bank_card_front_name
+        s3_bankimage_path_back = s3_staffbankcard_upload_folder + bank_card_back_name
 
-    # print("uploaded: ", uploaded_file)
+        uploaded_file_front = upload_image_to_s3(bank_card_front, bank_card_front_name, "bank_img")
+        card_front_read_url = generate_s3_url(s3_bankimage_path_front, 'read')
 
-    s3_read_url = generate_s3_url(s3_img_path, 'read')
+        uploaded_file_back = upload_image_to_s3(bank_card_back, bank_card_back_name, "bank_img")
+        card_back_read_url = generate_s3_url(s3_bankimage_path_back, 'read')
 
-    # append s3_read_url to employee_data
-    staff_data['img_url'] = s3_read_url
+        # put this two url in a dictionary like {"front": "url", "back": "url"}
+        bank_card_images = {"front": card_front_read_url, "back": card_back_read_url}
 
-    # print("s3_read_url: ", s3_read_url)
-
-    # user = await User.get(id=employee_data['user_id']).values('id')
+        #append
+        staff_data['bank_card_images'] = json.dumps(bank_card_images)
 
     # create staff
     staff = await Staff.create(**staff_data)
@@ -157,10 +167,17 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
     else:
         new_staff.licenses = []
 
+    # if there is only bank card images added
+    if bank_card_back and bank_card_front is not None:
+        #convert bank_card_images to json
+        new_staff.bank_card_images = json.loads(new_staff.bank_card_images)
+    else:
+        new_staff.bank_card_images = {}
+
     return new_staff
 
 @router.put("/update_staff")
-async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None)):
+async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None),  bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None)):
     staff_data = json.loads(staff_json)
 
     now = datetime.now()
@@ -185,20 +202,15 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         staff_data['licenses'] = json.dumps(staff_data['licenses'])
 
     if staff_image is not None:
-        is_file_image = staff_image.content_type.startswith('image/')
-
-        if not is_file_image:
-            raise HTTPException(status_code=400, detail='File uploaded is not an image')
-        
         now = datetime.now()
         image_name = staff_data['english_name'].split(
             ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + staff_image.filename.split('.')[-1]
         
         # s3_img_url = s3_upload_path + image_name
-        s3_img_path = s3_upload_folder + image_name
+        s3_img_path = s3_staffimage_upload_folder + image_name
 
         # upload to s3 bucket
-        uploaded_file = upload_image_to_s3(staff_image, image_name)
+        uploaded_file = upload_image_to_s3(staff_image, image_name, "img")
 
         # print("uploaded: ", uploaded_file)
 
@@ -208,6 +220,25 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         staff_data['img_url'] = s3_read_url
 
         # print("s3_read_url: ", s3_read_url)
+
+    if bank_card_front or bank_card_back is not None:
+        bank_card_front_name = now.strftime("_front_%Y%m%d_%H%M%S") + '.' + bank_card_front.filename.split('.')[-1]
+        bank_card_back_name = now.strftime("_back_%Y%m%d_%H%M%S") + '.' + bank_card_back.filename.split('.')[-1]
+        
+        s3_bankimage_path_front = s3_staffbankcard_upload_folder + bank_card_front_name
+        s3_bankimage_path_back = s3_staffbankcard_upload_folder + bank_card_back_name
+
+        uploaded_file_front = upload_image_to_s3(bank_card_front, bank_card_front_name, "bank_img")
+        card_front_read_url = generate_s3_url(s3_bankimage_path_front, 'read')
+
+        uploaded_file_back = upload_image_to_s3(bank_card_back, bank_card_back_name, "bank_img")
+        card_back_read_url = generate_s3_url(s3_bankimage_path_back, 'read')
+
+        # put this two url in a dictionary like {"front": "url", "back": "url"}
+        bank_card_images = {"front": card_front_read_url, "back": card_back_read_url}
+
+        #append
+        staff_data['bank_card_images'] = json.dumps(bank_card_images)
 
     staff_data_copy = staff_data.copy()
     
@@ -225,6 +256,13 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         updated_staff.licenses = json.loads(updated_staff.licenses)
     else:
         updated_staff.licenses = []
+
+     # if there is only bank card images added
+    if bank_card_back and bank_card_front is not None:
+        #convert bank_card_images to json
+        updated_staff.bank_card_images = json.loads(updated_staff.bank_card_images)
+    else:
+        updated_staff.bank_card_images = {}
 
     return updated_staff
 
