@@ -35,6 +35,8 @@ s3_staffimage_upload_folder = 'uploads/staff/img/'
 
 s3_staffbankcard_upload_folder = 'uploads/staff/bank_img/'
 
+s3_staffpassport_upload_folder = 'uploads/staff/passport_img/'
+
 s3_license_upload_folder = 'uploads/staff/pdf/'
 s3_contracts_folder = 'uploads/staff/contracts/'
 
@@ -51,25 +53,7 @@ async def get_staff(staff_group: str):
     # for more security later, we can use the user id instead of email
     # user_email = verify_token_email(user_email_token)
 
-    # get the user id from the token # change this later to token id
-    # user = await User.get(email=user_email_token).values('id')
-
-    # group the list with the staff group "caregiver" or "user"
-    # if staff_group == 'staff' or staff_group  == 'スタッフ':
-    #     staff = Staff.filter(disabled=False, staff_group='スタッフ',
-    #                             # user_id=user_id['id']).order_by('display_order').all()
-    #                             user_id=user['id']).all()
-    # elif staff_group == 'user' or staff_group == '利用者':
-    #     staff = Staff.filter(disabled=False, staff_group='利用者',
-    #                             # user_id=user_id['id']).order_by('display_order').all()
-    #                             user_id=user['id']).all()
-
-    # get all staff and just filter with staff group
-    # if staff_group == 'staff' or staff_group  == 'スタッフ':
-    # staff = Staff.filter(disabled=False).order_by('zaishoku_joukyou').all()
     staff = Staff.filter(disabled=False, zaishoku_joukyou__not="退社済").order_by('staff_code').all()
-    # elif staff_group == 'user' or staff_group == '利用者':
-    #     staff = Staff.filter(disabled=False, staff_group='利用者').all()
 
     staff_list = await staff_pydantic.from_queryset(staff)
 
@@ -80,6 +64,8 @@ async def get_staff(staff_group: str):
             staff.licenses = json.loads(staff.licenses)
         if staff.bank_card_images is not None:
             staff.bank_card_images = json.loads(staff.bank_card_images)
+        if staff.passport_details is not None:
+            staff.passport_details = json.loads(staff.passport_details)
         # print(staff.licenses)
 
 
@@ -98,7 +84,7 @@ async def get_staff_select():
     return staff_list
 
 @router.post("/add_staff")
-async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None), bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None)):
+async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None), bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None), passport_file: UploadFile = File(None)):
     staff_data = json.loads(staff_json)
 
     # file_names = []
@@ -123,7 +109,7 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
         staff_data['licenses'] = json.dumps(staff_data['licenses'])
     
-    
+    # staff profile photo
     if staff_image is not None:
         image_name = staff_data['english_name'].split(
         ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + staff_image.filename.split('.')[-1]
@@ -135,6 +121,7 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         # append s3_read_url to employee_data
         staff_data['img_url'] = s3_read_url
 
+    # staff bank card front and bank photos
     if bank_card_front or bank_card_back is not None:
         bank_card_front_name = now.strftime("_front_%Y%m%d_%H%M%S") + '.' + bank_card_front.filename.split('.')[-1]
         bank_card_back_name = now.strftime("_back_%Y%m%d_%H%M%S") + '.' + bank_card_back.filename.split('.')[-1]
@@ -153,6 +140,19 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
         #append
         staff_data['bank_card_images'] = json.dumps(bank_card_images)
+
+    # passport details with file
+    if passport_file is not None:
+        passport_file_name = now.strftime("_passport_%Y%m%d_%H%M%S") + '.' + passport_file.filename.split('.')[-1]
+        s3_passport_path = s3_staffpassport_upload_folder + passport_file_name
+        uploaded_file = upload_image_to_s3(passport_file, passport_file_name, "passport_img")
+        passport_read_url = generate_s3_url(s3_passport_path, 'read')
+
+        # add the url to the passport_details dict
+        staff_data['passport_details']['file'] = passport_read_url
+
+        #append
+        staff_data['passport_details'] = json.dumps(staff_data['passport_details'])
 
     # create staff
     staff = await Staff.create(**staff_data)
@@ -174,10 +174,13 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
     else:
         new_staff.bank_card_images = {}
 
+    # passport doesnt require photo
+    new_staff.passport_details = json.loads(new_staff.passport_details)
+
     return new_staff
 
 @router.put("/update_staff")
-async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None),  bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None)):
+async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None),  bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None), passport_file: UploadFile = File(None)):
     staff_data = json.loads(staff_json)
 
     now = datetime.now()
@@ -240,6 +243,19 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         #append
         staff_data['bank_card_images'] = json.dumps(bank_card_images)
 
+    # passport details with file
+    if passport_file is not None:
+        passport_file_name = now.strftime("_passport_%Y%m%d_%H%M%S") + '.' + passport_file.filename.split('.')[-1]
+        s3_passport_path = s3_staffpassport_upload_folder + passport_file_name
+        uploaded_file = upload_image_to_s3(passport_file, passport_file_name, "passport_img")
+        passport_read_url = generate_s3_url(s3_passport_path, 'read')
+
+        # add the url to the passport_details dict
+        staff_data['passport_details']['file'] = passport_read_url
+
+        #append
+        staff_data['passport_details'] = json.dumps(staff_data['passport_details'])
+
     staff_data_copy = staff_data.copy()
     
     staff_data_copy.pop('id')
@@ -263,6 +279,9 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         updated_staff.bank_card_images = json.loads(updated_staff.bank_card_images)
     else:
         updated_staff.bank_card_images = {}
+
+    # passport doesnt require photo
+    updated_staff.passport_details = json.loads(updated_staff.passport_details)
 
     return updated_staff
 

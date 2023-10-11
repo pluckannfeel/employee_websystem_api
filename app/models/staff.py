@@ -45,6 +45,7 @@ class Staff(Model):
     account_number = fields.CharField(max_length=64, null=True) #口座番号
     account_name = fields.CharField(max_length=64, null=True) #口座名義
     bank_card_images = fields.TextField(null=True) #銀行カード画像
+    passport_details = fields.TextField(null=True) #パスポート詳細
     disabled = fields.BooleanField(null=False, default=False) # instead of deleting the record, we just set this to true
     created_at = fields.DatetimeField(auto_now_add=True)
     
