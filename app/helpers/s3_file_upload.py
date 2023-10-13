@@ -1,4 +1,7 @@
-import os, boto3, shutil, time
+import os
+import boto3
+import shutil
+import time
 from dotenv import load_dotenv
 from botocore.exceptions import ClientError, NoCredentialsError
 from app.helpers.definitions import get_directory_path
@@ -15,7 +18,7 @@ client = boto3.client('s3',
                       aws_secret_access_key=secret_access_key)
 
 # file upload
-upload_path = get_directory_path() +  '\\uploads'
+upload_path = get_directory_path() + '\\uploads'
 
 bucket_name = os.environ["AWS_STORAGE_BUCKET_NAME"]
 
@@ -26,7 +29,7 @@ bucket_name = os.environ["AWS_STORAGE_BUCKET_NAME"]
 #         object_name = 'uploads/pdf/ssw/' + file_object.filename
 #     elif app_type == 'trainee':
 #         object_name = 'uploads/pdf/trainee/' + file_object.filename
-    
+
 #     temp = NamedTemporaryFile(delete=False)
 #     try:
 #         try:
@@ -37,10 +40,10 @@ bucket_name = os.environ["AWS_STORAGE_BUCKET_NAME"]
 #             return {"message": "There was an error uploading the file. " + str(e)}
 #         finally:
 #             file_object.file.close()
-                        
+
 #         # upload here
 #         client.upload_file(temp.name, bucket_name, object_name, ExtraArgs={"ACL": 'public-read', "ContentType": file_object.content_type})
-        
+
 #     except ClientError as e:
 #         return {"message": "There was an error processing the file.", "error": e}
 #     finally:
@@ -48,8 +51,9 @@ bucket_name = os.environ["AWS_STORAGE_BUCKET_NAME"]
 #         # print(contents)  # Handle file contents as desired
 #         return {"filename": file_object.filename}
 
-def upload_image_to_s3(imageFile, new_image_name, folder_path):    
-    object_name = f'uploads/staff/{folder_path}/{new_image_name}' 
+
+def upload_image_to_s3(imageFile, new_image_name, folder_path):
+    object_name = f'uploads/staff/{folder_path}/{new_image_name}'
     temp = NamedTemporaryFile(delete=False)
     try:
         try:
@@ -60,17 +64,18 @@ def upload_image_to_s3(imageFile, new_image_name, folder_path):
             return {"message": "There was an error uploading the file. " + str(e)}
         finally:
             imageFile.file.close()
-            
-        client.upload_file(temp.name, bucket_name, object_name, ExtraArgs={"ACL": 'public-read', "ContentType": imageFile.content_type})
-        
+
+        client.upload_file(temp.name, bucket_name, object_name, ExtraArgs={
+                           "ACL": 'public-read', "ContentType": imageFile.content_type})
+
         return new_image_name
-            
+
         # # upload here
         # client.upload_file(temp.name, bucket_name, object_name, ExtraArgs={"ACL": 'public-read', "ContentType": imageFile.content_type})
-        
+
         # #  rename s3 uploaded file
         # client.copy_object(Bucket=bucket_name, CopySource=bucket_name + '/' + object_name, Key='uploads/img/' + new_image_name, ACL='public-read')
-               
+
         # # delete old file
         # response = client.delete_object(
         #     Bucket=bucket_name,
@@ -83,7 +88,8 @@ def upload_image_to_s3(imageFile, new_image_name, folder_path):
         os.remove(temp.name)
         # print(contents)  # Handle file contents as desired
         return {"filename": imageFile.filename}
-    
+
+
 def upload_file_to_s3(file_object, new_file_name, folder_path):
     # slash is not needed
     object_name = f'{folder_path}{new_file_name}'
@@ -99,7 +105,8 @@ def upload_file_to_s3(file_object, new_file_name, folder_path):
             file_object.file.close()
 
         # upload here
-        client.upload_file(temp.name, bucket_name, object_name, ExtraArgs={"ACL": 'public-read', "ContentType": file_object.content_type})
+        client.upload_file(temp.name, bucket_name, object_name, ExtraArgs={
+                           "ACL": 'public-read', "ContentType": file_object.content_type})
 
         return new_file_name
     except ClientError as e:
@@ -108,27 +115,26 @@ def upload_file_to_s3(file_object, new_file_name, folder_path):
         os.remove(temp.name)
         # print(contents)  # Handle file contents as desired
         return {"filename": file_object.filename}
-    
 
 
-
-#generate s3 bucket url
+# generate s3 bucket url
 def generate_s3_url(file_name, access_type):
     print(f"file_name :{file_name}")
     try:
         # expiration_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=)
-        
+
         if access_type == 'read':
-            url = client.generate_presigned_url('get_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=60)
-            
+            url = client.generate_presigned_url(
+                'get_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=60)
+
             # cut off the query string
             url = url.split('?')[0]
         elif access_type == 'write':
-            url = client.generate_presigned_url('put_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=60)
-            
-        
+            url = client.generate_presigned_url(
+                'put_object', Params={'Bucket': bucket_name, 'Key': file_name}, ExpiresIn=60)
+
         # print("url: ", url)
-        
+
         return url
     except NoCredentialsError:
         print("Credentials not available")
@@ -141,4 +147,3 @@ def is_file_exists(file_path):
         return True
     except ClientError as e:
         return False
-    

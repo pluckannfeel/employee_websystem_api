@@ -14,7 +14,7 @@ from app.models.user import User
 from app.models.staff import Staff, staff_pydantic, staffSelect_pydantic
 from app.models.staff_workschedule import Staff_WorkSchedule, staff_workschedule_pydantic
 
-# helpers 
+# helpers
 from app.helpers.zipfile import zipfiles
 from app.helpers.generate_pdf import fill_pdf_contract
 from app.helpers.onedrive import read_from_onedrive, upload_file_to_onedrive
@@ -22,7 +22,7 @@ from app.helpers.onedrive import read_from_onedrive, upload_file_to_onedrive
 # s3
 from app.helpers.s3_file_upload import upload_file_to_s3, generate_s3_url, upload_image_to_s3, is_file_exists
 
-#schema
+# schema
 from app.models.staff_schema import StaffLicense, LicenseData
 
 from tempfile import NamedTemporaryFile
@@ -34,7 +34,7 @@ from tempfile import NamedTemporaryFile
 s3_staffimage_upload_folder = 'uploads/staff/img/'
 
 s3_staffbankcard_upload_folder = 'uploads/staff/bank_img/'
-
+s3_staffresidencecard_upload_folder = 'uploads/staff/residencecard_img/'
 s3_staffpassport_upload_folder = 'uploads/staff/passport_img/'
 
 s3_license_upload_folder = 'uploads/staff/pdf/'
@@ -46,6 +46,7 @@ router = APIRouter(
     responses={404: {"some_description": "Not found"}}
 )
 
+
 @router.get("")
 # async def get_staff(user_email_token: str, staff_group: str):
 async def get_staff(staff_group: str):
@@ -53,7 +54,8 @@ async def get_staff(staff_group: str):
     # for more security later, we can use the user id instead of email
     # user_email = verify_token_email(user_email_token)
 
-    staff = Staff.filter(disabled=False, zaishoku_joukyou__not="退社済").order_by('staff_code').all()
+    staff = Staff.filter(disabled=False, zaishoku_joukyou__not="退社済").order_by(
+        'staff_code').all()
 
     staff_list = await staff_pydantic.from_queryset(staff)
 
@@ -62,18 +64,24 @@ async def get_staff(staff_group: str):
     for staff in staff_list:
         if staff.licenses is not None:
             staff.licenses = json.loads(staff.licenses)
+
         if staff.bank_card_images is not None:
             staff.bank_card_images = json.loads(staff.bank_card_images)
+
         if staff.passport_details is not None:
             staff.passport_details = json.loads(staff.passport_details)
-        # print(staff.licenses)
 
+        if staff.residence_card_details is not None:
+            print(staff.residence_card_details)
+            staff.residence_card_details = json.loads(
+                staff.residence_card_details)
 
     return staff_list
 
+
 @router.get("/staff_select")
 async def get_staff_select():
-    
+
     # same as staff but only take id, english_name, japanese_name, staff_group, duty_type
     staff = Staff.filter(disabled=False).exclude(zaishoku_joukyou="退社済").all()
 
@@ -83,24 +91,27 @@ async def get_staff_select():
 
     return staff_list
 
+
 @router.post("/add_staff")
-async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None), bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None), passport_file: UploadFile = File(None)):
+async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None), bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None), passport_file: UploadFile = File(None), residence_card_front: UploadFile = File(None), residence_card_back: UploadFile = File(None)):
     staff_data = json.loads(staff_json)
 
     # file_names = []
     now = datetime.now()
     if licenses is not None:
         for file in licenses:
-        # You can access file properties like filename, content type, and content
-        # file_names.append(file.filename)
+            # You can access file properties like filename, content type, and content
+            # file_names.append(file.filename)
 
-        # create a new filename string with file name plus timestamp
-            new_file_name = file.filename.split('.')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
+            # create a new filename string with file name plus timestamp
+            new_file_name = file.filename.split(
+                '.')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
             # upload to s3 bucket
-            uploaded_file = upload_file_to_s3(file, new_file_name, s3_license_upload_folder)
+            uploaded_file = upload_file_to_s3(
+                file, new_file_name, s3_license_upload_folder)
 
             s3_file_path = s3_license_upload_folder + new_file_name
-            
+
             s3_read_url = generate_s3_url(s3_file_path, 'read')
 
             # the license list has the same length as the staff_data's licenses list please change the value to the new file name in the staff_data
@@ -108,11 +119,11 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
             # replace the file object with the s3 url
 
         staff_data['licenses'] = json.dumps(staff_data['licenses'])
-    
+
     # staff profile photo
     if staff_image is not None:
         image_name = staff_data['english_name'].split(
-        ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + staff_image.filename.split('.')[-1]
+            ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + staff_image.filename.split('.')[-1]
         # s3_img_url = s3_upload_path + image_name
         s3_img_path = s3_staffimage_upload_folder + image_name
         # upload to s3 bucket
@@ -121,38 +132,84 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         # append s3_read_url to employee_data
         staff_data['img_url'] = s3_read_url
 
-    # staff bank card front and bank photos
-    if bank_card_front or bank_card_back is not None:
-        bank_card_front_name = now.strftime("_front_%Y%m%d_%H%M%S") + '.' + bank_card_front.filename.split('.')[-1]
-        bank_card_back_name = now.strftime("_back_%Y%m%d_%H%M%S") + '.' + bank_card_back.filename.split('.')[-1]
-        
-        s3_bankimage_path_front = s3_staffbankcard_upload_folder + bank_card_front_name
-        s3_bankimage_path_back = s3_staffbankcard_upload_folder + bank_card_back_name
+    # object for bank card images, if the bank_card_images is empty, we will create a new dict
+    bank_card_images = staff_data['bank_card_images'] if staff_data['bank_card_images'] != '' else {
+    }
 
-        uploaded_file_front = upload_image_to_s3(bank_card_front, bank_card_front_name, "bank_img")
+    if bank_card_front is not None:
+        bank_card_front_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_front_%Y%m%d_%H%M%S") + '.' + bank_card_front.filename.split('.')[-1]
+        s3_bankimage_path_front = s3_staffbankcard_upload_folder + bank_card_front_name
+        uploaded_file_front = upload_image_to_s3(
+            bank_card_front, bank_card_front_name, "bank_img")
         card_front_read_url = generate_s3_url(s3_bankimage_path_front, 'read')
 
-        uploaded_file_back = upload_image_to_s3(bank_card_back, bank_card_back_name, "bank_img")
+        # add the url to the bank_card_images dict make sure it is json friendly
+        bank_card_images['front'] = card_front_read_url
+
+    if bank_card_back is not None:
+        bank_card_back_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_back_%Y%m%d_%H%M%S") + '.' + bank_card_back.filename.split('.')[-1]
+        s3_bankimage_path_back = s3_staffbankcard_upload_folder + bank_card_back_name
+        uploaded_file_back = upload_image_to_s3(
+            bank_card_back, bank_card_back_name, "bank_img")
         card_back_read_url = generate_s3_url(s3_bankimage_path_back, 'read')
 
-        # put this two url in a dictionary like {"front": "url", "back": "url"}
-        bank_card_images = {"front": card_front_read_url, "back": card_back_read_url}
+        # add the url to the bank_card_images dict make sure it is json friendly
+        bank_card_images['back'] = card_back_read_url
 
-        #append
-        staff_data['bank_card_images'] = json.dumps(bank_card_images)
+    # stringify bank_card_images
+    staff_data['bank_card_images'] = json.dumps(bank_card_images)
+
+    # residence card front and back
+    if residence_card_front is not None:
+        residence_card_front_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_front_%Y%m%d_%H%M%S") + '.' + residence_card_front.filename.split('.')[-1]
+        s3_residencecard_path_front = s3_staffresidencecard_upload_folder + \
+            residence_card_front_name
+
+        uploaded_file_front = upload_image_to_s3(
+            residence_card_front, residence_card_front_name, "residencecard_img")
+        card_front_read_url = generate_s3_url(
+            s3_residencecard_path_front, 'read')
+
+        staff_data['residence_card_details']['front'] = card_front_read_url
+
+    if residence_card_back is not None:
+        residence_card_back_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_back_%Y%m%d_%H%M%S") + '.' + residence_card_back.filename.split('.')[-1]
+        s3_residencecard_path_back = s3_staffresidencecard_upload_folder + \
+            residence_card_back_name
+        uploaded_file_back = upload_image_to_s3(
+            residence_card_back, residence_card_back_name, "residencecard_img")
+        card_back_read_url = generate_s3_url(
+            s3_residencecard_path_back, 'read')
+
+        staff_data['residence_card_details']['back'] = card_back_read_url
+
+    # append residence_card_details
+    staff_data['residence_card_details'] = json.dumps(
+        staff_data['residence_card_details'])
 
     # passport details with file
     if passport_file is not None:
-        passport_file_name = now.strftime("_passport_%Y%m%d_%H%M%S") + '.' + passport_file.filename.split('.')[-1]
+        passport_file_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_passport_%Y%m%d_%H%M%S") + '.' + passport_file.filename.split('.')[-1]
         s3_passport_path = s3_staffpassport_upload_folder + passport_file_name
-        uploaded_file = upload_image_to_s3(passport_file, passport_file_name, "passport_img")
+        uploaded_file = upload_image_to_s3(
+            passport_file, passport_file_name, "passport_img")
         passport_read_url = generate_s3_url(s3_passport_path, 'read')
 
         # add the url to the passport_details dict
         staff_data['passport_details']['file'] = passport_read_url
 
-        #append
-        staff_data['passport_details'] = json.dumps(staff_data['passport_details'])
+    # append passport_details
+    staff_data['passport_details'] = json.dumps(staff_data['passport_details'])
 
     # create staff
     staff = await Staff.create(**staff_data)
@@ -162,40 +219,42 @@ async def create_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
     # if there is only license
     if licenses is not None:
-    # convert licenses to json
+        # convert licenses to json
         new_staff.licenses = json.loads(new_staff.licenses)
     else:
         new_staff.licenses = []
 
-    # if there is only bank card images added
-    if bank_card_back and bank_card_front is not None:
-        #convert bank_card_images to json
-        new_staff.bank_card_images = json.loads(new_staff.bank_card_images)
-    else:
-        new_staff.bank_card_images = {}
+    new_staff.bank_card_images = json.loads(
+        new_staff.bank_card_images)
 
-    # passport doesnt require photo
-    new_staff.passport_details = json.loads(new_staff.passport_details)
+    new_staff.residence_card_details = json.loads(
+        new_staff.residence_card_details)
+
+    new_staff.passport_details = json.loads(
+        new_staff.passport_details)
 
     return new_staff
 
+
 @router.put("/update_staff")
-async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None),  bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None), passport_file: UploadFile = File(None)):
+async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = File(None), licenses: List[UploadFile] = File(None),  bank_card_front: UploadFile = File(None), bank_card_back: UploadFile = File(None), passport_file: UploadFile = File(None), residence_card_front: UploadFile = File(None), residence_card_back: UploadFile = File(None)):
     staff_data = json.loads(staff_json)
 
     now = datetime.now()
     if licenses is not None:
         for file in licenses:
-        # You can access file properties like filename, content type, and content
-        # file_names.append(file.filename)
+            # You can access file properties like filename, content type, and content
+            # file_names.append(file.filename)
 
-        # create a new filename string with file name plus timestamp
-            new_file_name = file.filename.split('.')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
+            # create a new filename string with file name plus timestamp
+            new_file_name = file.filename.split(
+                '.')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
             # upload to s3 bucket
-            uploaded_file = upload_file_to_s3(file, new_file_name, s3_license_upload_folder)
+            uploaded_file = upload_file_to_s3(
+                file, new_file_name, s3_license_upload_folder)
 
             s3_file_path = s3_license_upload_folder + new_file_name
-            
+
             s3_read_url = generate_s3_url(s3_file_path, 'read')
 
             # the license list has the same length as the staff_data's licenses list please change the value to the new file name in the staff_data
@@ -208,7 +267,7 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         now = datetime.now()
         image_name = staff_data['english_name'].split(
             ' ')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + staff_image.filename.split('.')[-1]
-        
+
         # s3_img_url = s3_upload_path + image_name
         s3_img_path = s3_staffimage_upload_folder + image_name
 
@@ -224,66 +283,112 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
         # print("s3_read_url: ", s3_read_url)
 
-    if bank_card_front or bank_card_back is not None:
-        bank_card_front_name = now.strftime("_front_%Y%m%d_%H%M%S") + '.' + bank_card_front.filename.split('.')[-1]
-        bank_card_back_name = now.strftime("_back_%Y%m%d_%H%M%S") + '.' + bank_card_back.filename.split('.')[-1]
-        
-        s3_bankimage_path_front = s3_staffbankcard_upload_folder + bank_card_front_name
-        s3_bankimage_path_back = s3_staffbankcard_upload_folder + bank_card_back_name
+    # object for bank card images, if the bank_card_images is empty, we will create a new dict
+    bank_card_images = staff_data['bank_card_images'] if staff_data['bank_card_images'] != '' else {
+    }
 
-        uploaded_file_front = upload_image_to_s3(bank_card_front, bank_card_front_name, "bank_img")
+    if bank_card_front is not None:
+        bank_card_front_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_front_%Y%m%d_%H%M%S") + '.' + bank_card_front.filename.split('.')[-1]
+        s3_bankimage_path_front = s3_staffbankcard_upload_folder + bank_card_front_name
+        uploaded_file_front = upload_image_to_s3(
+            bank_card_front, bank_card_front_name, "bank_img")
         card_front_read_url = generate_s3_url(s3_bankimage_path_front, 'read')
 
-        uploaded_file_back = upload_image_to_s3(bank_card_back, bank_card_back_name, "bank_img")
+        # add the url to the bank_card_images dict make sure it is json friendly
+        bank_card_images['front'] = card_front_read_url
+
+    if bank_card_back is not None:
+        bank_card_back_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_back_%Y%m%d_%H%M%S") + '.' + bank_card_back.filename.split('.')[-1]
+        s3_bankimage_path_back = s3_staffbankcard_upload_folder + bank_card_back_name
+        uploaded_file_back = upload_image_to_s3(
+            bank_card_back, bank_card_back_name, "bank_img")
         card_back_read_url = generate_s3_url(s3_bankimage_path_back, 'read')
 
-        # put this two url in a dictionary like {"front": "url", "back": "url"}
-        bank_card_images = {"front": card_front_read_url, "back": card_back_read_url}
+        # add the url to the bank_card_images dict make sure it is json friendly
+        bank_card_images['back'] = card_back_read_url
 
-        #append
-        staff_data['bank_card_images'] = json.dumps(bank_card_images)
+    # stringify bank_card_images
+    staff_data['bank_card_images'] = json.dumps(bank_card_images)
+
+    # residence card front and back
+    if residence_card_front is not None:
+        residence_card_front_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_front_%Y%m%d_%H%M%S") + '.' + residence_card_front.filename.split('.')[-1]
+        s3_residencecard_path_front = s3_staffresidencecard_upload_folder + \
+            residence_card_front_name
+
+        uploaded_file_front = upload_image_to_s3(
+            residence_card_front, residence_card_front_name, "residencecard_img")
+        card_front_read_url = generate_s3_url(
+            s3_residencecard_path_front, 'read')
+
+        staff_data['residence_card_details']['front'] = card_front_read_url
+
+    if residence_card_back is not None:
+        residence_card_back_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_back_%Y%m%d_%H%M%S") + '.' + residence_card_back.filename.split('.')[-1]
+        s3_residencecard_path_back = s3_staffresidencecard_upload_folder + \
+            residence_card_back_name
+        uploaded_file_back = upload_image_to_s3(
+            residence_card_back, residence_card_back_name, "residencecard_img")
+        card_back_read_url = generate_s3_url(
+            s3_residencecard_path_back, 'read')
+
+        staff_data['residence_card_details']['back'] = card_back_read_url
+
+    # append
+    staff_data['residence_card_details'] = json.dumps(
+        staff_data['residence_card_details'])
 
     # passport details with file
     if passport_file is not None:
-        passport_file_name = now.strftime("_passport_%Y%m%d_%H%M%S") + '.' + passport_file.filename.split('.')[-1]
+        passport_file_name = staff_data['english_name'].split(
+            ' ')[0] + now.strftime(
+            "_passport_%Y%m%d_%H%M%S") + '.' + passport_file.filename.split('.')[-1]
         s3_passport_path = s3_staffpassport_upload_folder + passport_file_name
-        uploaded_file = upload_image_to_s3(passport_file, passport_file_name, "passport_img")
+        uploaded_file = upload_image_to_s3(
+            passport_file, passport_file_name, "passport_img")
         passport_read_url = generate_s3_url(s3_passport_path, 'read')
 
         # add the url to the passport_details dict
         staff_data['passport_details']['file'] = passport_read_url
 
-        #append
-        staff_data['passport_details'] = json.dumps(staff_data['passport_details'])
+    # append
+    staff_data['passport_details'] = json.dumps(staff_data['passport_details'])
 
     staff_data_copy = staff_data.copy()
-    
+
     staff_data_copy.pop('id')
 
     # update staff
     await Staff.filter(id=staff_data['id']).update(**staff_data_copy)
-    
 
     updated_staff = await staff_pydantic.from_queryset_single(Staff.get(id=staff_data['id']))
 
     # if there is only license
     if licenses is not None:
-    # convert licenses to json
+        # convert licenses to json
         updated_staff.licenses = json.loads(updated_staff.licenses)
     else:
         updated_staff.licenses = []
 
-     # if there is only bank card images added
-    if bank_card_back and bank_card_front is not None:
-        #convert bank_card_images to json
-        updated_staff.bank_card_images = json.loads(updated_staff.bank_card_images)
-    else:
-        updated_staff.bank_card_images = {}
+    updated_staff.bank_card_images = json.loads(
+        updated_staff.bank_card_images)
 
-    # passport doesnt require photo
-    updated_staff.passport_details = json.loads(updated_staff.passport_details)
+    updated_staff.residence_card_details = json.loads(
+        updated_staff.residence_card_details)
+
+    updated_staff.passport_details = json.loads(
+        updated_staff.passport_details)
 
     return updated_staff
+
 
 @router.put("/delete_staff")
 async def delete_staff(staff_json: str = Form(...)):
@@ -308,7 +413,7 @@ async def generate_contracts(staff_id: str):
 
     contract_file_name = staff_name.replace(" ", "") + formatted_now + '.pdf'
 
-    # check aws s3 bucket if this file exist. 
+    # check aws s3 bucket if this file exist.
     # if exist, return the file url
     # if not exist, create the file and upload to s3 bucket
 
@@ -324,7 +429,7 @@ async def generate_contracts(staff_id: str):
     # open the pdf file in binary mode
     # with open(pdf, 'rb') as file:
     # zipf = zipfiles(pdf, f'files_{staff_id}')
-    
+
     return pdf[0]
 
 # for csv
@@ -348,6 +453,7 @@ async def generate_contracts(staff_id: str):
 
 #     return response
 
+
 @router.get('/download')
 async def download_staff_list():
     # get all staff which is ordered by zaishoku_joukyou
@@ -365,7 +471,7 @@ async def download_staff_list():
 
     # change column headers
     headers = ["所属", "社員番号", "NAME", "職員名", "ニックネーム", "国籍 ", "入社年月日", "退社年月日", "郵便番号",
-            "都道府県", "市区町村", "町名以下", "建物名", "職員電話番号", "個人Eメールアドレス", "職員Eメールアドレス", "雇用形態", "在職状況"]
+               "都道府県", "市区町村", "町名以下", "建物名", "職員電話番号", "個人Eメールアドレス", "職員Eメールアドレス", "雇用形態", "在職状況"]
 
     # Create a temporary Excel file
     with NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
@@ -374,7 +480,8 @@ async def download_staff_list():
 
         # Get the xlsxwriter workbook and worksheet objects
         workbook = excel_writer.book
-        worksheet = excel_writer.sheets['Sheet1']  # You may need to adjust the sheet name
+        # You may need to adjust the sheet name
+        worksheet = excel_writer.sheets['Sheet1']
 
         # Adjust column widths based on content
         # for i, col in enumerate(headers):
@@ -387,38 +494,42 @@ async def download_staff_list():
             column_len = max(max_len, len(headers[i]) + 2)  # +2 for padding
             worksheet.set_column(i, i, column_len)
 
-        #FFD580
-        format_orange = workbook.add_format({'bg_color': '#FFD580'})  # Red background
+        # FFD580
+        format_orange = workbook.add_format(
+            {'bg_color': '#FFD580'})  # Red background
         worksheet.conditional_format(
             1,  # Starting row (assuming header is in row 1)
             headers.index('在職状況'),  # Column index of '雇用形態'
             df.shape[0],  # Number of rows
             headers.index('在職状況'),  # Column index of '雇用形態'
-            {'type': 'text', 'criteria': 'containing', 'value': '退社済', 'format': format_orange}
+            {'type': 'text', 'criteria': 'containing',
+                'value': '退社済', 'format': format_orange}
         )
 
         excel_writer.close()  # Close the ExcelWriter to save the Excel file
 
     # Return the Excel file as a response
-    response = FileResponse(tmp_file.name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response = FileResponse(
+        tmp_file.name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response.headers["Content-Disposition"] = "attachment; filename=staff.xlsx"
 
     return response
 
 # Define a function to apply row coloring
+
+
 def highlight_rows(row):
     if row["zaishoku_joukyou"] == "退社済":
         return ['background-color: gray'] * len(row)
     else:
         return [''] * len(row)
-    
 
 
 @router.get("/workschedule_list")
 # async def get_staff(user_email_token: str, staff_group: str):
 async def get_all_schedule():
-        # add staffs japanese name and english name in the values
-   return await Staff_WorkSchedule.all().values()
+    # add staffs japanese name and english name in the values
+    return await Staff_WorkSchedule.all().values()
 
 
 @router.post('/add_workschedule')
@@ -426,7 +537,7 @@ async def create_workschedule(staff_workschedule_json: str = Form(...)):
     work_schedule_data = json.loads(staff_workschedule_json)
 
     staff_data = work_schedule_data.pop('staff')
-    #get id from staff_data 
+    # get id from staff_data
     staff_id = staff_data['id']
 
     # add staff_id on work_schedule_data
