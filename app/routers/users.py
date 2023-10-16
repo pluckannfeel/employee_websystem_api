@@ -60,12 +60,12 @@ s3_upload_path = str(os.getenv("AWS_PPS_STORAGE_URI")) + 'uploads'
 #             detail="Invalid or Expired token.",
 #             headers={"WWW-Authenticate": "Bearer"}
 #         )
-    
+
 #     # Query the database for user info
 #     user_info = await User.get(email=user.email).values(
 #         'id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at', 'is_verified'
 #     )
-    
+
 #     if not user_info:
 #         # If user_info is not found, you might want to return a different error status code, e.g., 404 Not Found
 #         raise HTTPException(
@@ -79,20 +79,22 @@ s3_upload_path = str(os.getenv("AWS_PPS_STORAGE_URI")) + 'uploads'
 async def get_users():
     return await user_pydantic.from_queryset(User.all())
 
-@router.get("/get_user_info", tags=["Users"], name="test")
+
+@router.get("/get_user_info", tags=["Users"], name="Get user info")
 async def get_user_info(token: str):
     # token = await token_generator('millanjarvis421@gmail.com', 'Sivrajnallim96')
     user = await verify_token_email(token)
 
     if not user:
-    # Raise a 401 Unauthorized error
+        # Raise a 401 Unauthorized error
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or Expired token.",
             headers={"WWW-Authenticate": "Bearer"}
         )
-    
+
     return user
+
 
 @router.get("/{email}", tags=["Users"], name="Get user by email", responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
 async def read_user(email: str):
@@ -103,7 +105,7 @@ async def read_user(email: str):
     )
 
     return user_info
-    
+
 
 @router.get("/verification", tags=["Users"], name="Verify User", responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
 async def verify_user(token: str):  # request: Request,
@@ -228,12 +230,12 @@ async def create_user(user: CreateUser) -> dict:
 #             detail="Invalid or Expired token.",
 #             headers={"WWW-Authenticate": "Bearer"}
 #         )
-    
+
 #     # Query the database for user info
 #     user_info = await User.get(email=user.email).values(
 #         'id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at', 'is_verified'
 #     )
-    
+
 #     if not user_info:
 #         # If user_info is not found, you might want to return a different error status code, e.g., 404 Not Found
 #         raise HTTPException(

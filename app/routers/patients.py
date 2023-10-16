@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, FileResponse
 
 # models
 from app.models.user import User
-from app.models.patient import Patient, patient_pydantic
+from app.models.patient import Patient, patient_pydantic, patientSelect_pydantic
 
 from tempfile import NamedTemporaryFile
 
@@ -25,6 +25,7 @@ router = APIRouter(
     tags=["Patient"],
     responses={404: {"some_description": "Not found"}}
 )
+
 
 @router.get("")
 # async def get_staff(user_email_token: str, staff_group: str):
@@ -43,18 +44,33 @@ async def get_patients():
 
     return patients
 
+
+@router.get("/patient_select")
+async def get_patient_select():
+
+    # same as staff but only take id, english_name, japanese_name, staff_group, duty_type
+    patient = Patient.all()
+
+    patient_list = await patientSelect_pydantic.from_queryset(patient)
+
+    # dont use pydantic
+
+    return patient_list
+
+
 @router.post("/add_patient")
 async def create_patient(patient_json: str = Form(...)):
     patient_data = json.loads(patient_json)
 
     now = datetime.now()
-    
+
     patient = await Patient.create(**patient_data)
 
     new_patient = await patient_pydantic.from_tortoise_orm(patient)
     # new_staff = await Staff.get(id=staff.id).values()
 
     return new_patient
+
 
 @router.put("/update_patient")
 async def update_patient(patient_json: str = Form(...)):
@@ -69,6 +85,7 @@ async def update_patient(patient_json: str = Form(...)):
 
     return updated_patient
 
+
 @router.put("/delete_patients")
 async def delete_patients(patient_json: str = Form(...)):
     patient_data = json.loads(patient_json)
@@ -81,12 +98,13 @@ async def delete_patients(patient_json: str = Form(...)):
 
     # return {'msg': 'Employees deleted successfully.'}
 
+
 @router.get('/download')
 async def download_patient_list():
     # get all patient values but exclude id and created_at
     patient = await Patient.all().values("name_kanji", "name_kana", "birth_date", "age", "gender", "disable_support_category", "beneficiary_number", "postal_code", "prefecture",
-                                    "municipality", "town", "building", "phone_number", "telephone_number", "billing_method",
-                                      "billing_address", "billing_postal_code", "patient_status", "remarks")
+                                         "municipality", "town", "building", "phone_number", "telephone_number", "billing_method",
+                                         "billing_address", "billing_postal_code", "patient_status", "remarks")
 
     df = pd.DataFrame(patient)
 
@@ -96,7 +114,7 @@ async def download_patient_list():
 
     # change column headers
     headers = ["利用者名", "利用者カナ", "利用者生年月日", "年齢", "性別", "障害支援区分", "受給者番号", "郵便番号", "都道府県 ", "市区町村", "町名以下",
-            "建物名", "利用者電話番号", "利用者携帯電話番号", "請求方法", "請求送付先", "請求先郵便番号", "利用者状態", "備考"]
+               "建物名", "利用者電話番号", "利用者携帯電話番号", "請求方法", "請求送付先", "請求先郵便番号", "利用者状態", "備考"]
 
     # Create a temporary Excel file
     with NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
@@ -105,7 +123,8 @@ async def download_patient_list():
 
         # Get the xlsxwriter workbook and worksheet objects
         workbook = excel_writer.book
-        worksheet = excel_writer.sheets['Sheet1']  # You may need to adjust the sheet name
+        # You may need to adjust the sheet name
+        worksheet = excel_writer.sheets['Sheet1']
 
         # Adjust column widths based on content
         # for i, col in enumerate(headers):
@@ -121,10 +140,12 @@ async def download_patient_list():
         excel_writer.close()  # Close the ExcelWriter to save the Excel file
 
     # Return the Excel file as a response
-    response = FileResponse(tmp_file.name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response = FileResponse(
+        tmp_file.name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response.headers["Content-Disposition"] = "attachment; filename=patients.xlsx"
 
     return response
+
 
 @router.put("/add_patient_images")
 async def add_patient_images(patient_id: str = Form(...), images: List[UploadFile] = File(None)):
@@ -135,15 +156,17 @@ async def add_patient_images(patient_id: str = Form(...), images: List[UploadFil
     if images is not None:
         for file in images:
             print(file.filename)
-            new_file_name = file.filename.split('.')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
+            new_file_name = file.filename.split(
+                '.')[0] + now.strftime("_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
             # upload to s3 bucket
-            uploaded_file = upload_file_to_s3(file, new_file_name, s3_patients_upload_img_folder)
+            uploaded_file = upload_file_to_s3(
+                file, new_file_name, s3_patients_upload_img_folder)
 
             s3_file_path = s3_patients_upload_img_folder + new_file_name
-            
+
             s3_read_url = generate_s3_url(s3_file_path, 'read')
 
-            #append new urls to images list
+            # append new urls to images list
             image_list.append(s3_read_url)
 
     # get patients images and convert to list
@@ -160,13 +183,14 @@ async def add_patient_images(patient_id: str = Form(...), images: List[UploadFil
     # update patient images
     await Patient.filter(id=patient_id).update(images=image_list_str)
 
-
     # return images list and patient id in a dict
     return {'patient_id': patient_id, 'images': image_list}
+
 
 @router.put("/delete_patient_images")
 async def delete_patient_images(patient_id: str = Form(...), images: List[UploadFile] = File(None)):
     pass
+
 
 @router.put("/add_patient_instructions")
 async def add_patient_instructions(patient_json: str = Form(...), instructions_files: List[UploadFile] = File(None)):
@@ -175,29 +199,28 @@ async def add_patient_instructions(patient_json: str = Form(...), instructions_f
 
     if instructions_files is not None:
         for file in instructions_files:
-            new_file_name = file.filename.split('.')[0] + now.strftime("_ins_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
+            new_file_name = file.filename.split(
+                '.')[0] + now.strftime("_ins_%Y%m%d_%H%M%S") + '.' + file.filename.split('.')[-1]
 
-            uploaded_file = upload_file_to_s3(file, new_file_name, s3_patients_upload_pdf_folder)
+            uploaded_file = upload_file_to_s3(
+                file, new_file_name, s3_patients_upload_pdf_folder)
 
             s3_file_path = s3_patients_upload_pdf_folder + new_file_name
-            
+
             s3_read_url = generate_s3_url(s3_file_path, 'read')
 
-            #append new urls to instructions list, the intructions_files should have the same order as the instructions
-            patient_data['instructions'][instructions_files.index(file)]['file'] = s3_read_url
-
+            # append new urls to instructions list, the intructions_files should have the same order as the instructions
+            patient_data['instructions'][instructions_files.index(
+                file)]['file'] = s3_read_url
 
     # convert to json string
     patient_data['instructions'] = json.dumps(patient_data['instructions'])
 
-    #update patient instructions
+    # update patient instructions
     await Patient.filter(id=patient_data['id']).update(instructions=patient_data['instructions'])
 
-    
     # convert back insturctions to list, get it from patient_pydantic
     updated_patient = await patient_pydantic.from_queryset_single(Patient.get(id=patient_data['id']))
 
     # only return patient id and instructions which converted back to list
     return {'patient_id': patient_data['id'], 'instructions': json.loads(updated_patient.instructions)}
-
-        

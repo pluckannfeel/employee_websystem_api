@@ -20,6 +20,7 @@ from app.routers.employees import router as employeeRouter
 from app.routers.staff import router as staffRouter
 from app.routers.patients import router as patientRouter
 from app.routers.japan_addresses import router as japanAddressesRouter
+from app.routers.companies import router as companyRouter
 
 from mangum import Mangum
 
@@ -47,6 +48,7 @@ initialize_db(app)
 app.include_router(staffRouter)
 app.include_router(patientRouter)
 app.include_router(userRouter)
+app.include_router(companyRouter)
 app.include_router(japanAddressesRouter)
 
 

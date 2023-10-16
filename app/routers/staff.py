@@ -72,7 +72,7 @@ async def get_staff(staff_group: str):
             staff.passport_details = json.loads(staff.passport_details)
 
         if staff.residence_card_details is not None:
-            print(staff.residence_card_details)
+            # print(staff.residence_card_details)
             staff.residence_card_details = json.loads(
                 staff.residence_card_details)
 
@@ -86,8 +86,6 @@ async def get_staff_select():
     staff = Staff.filter(disabled=False).exclude(zaishoku_joukyou="退社済").all()
 
     staff_list = await staffSelect_pydantic.from_queryset(staff)
-
-    # dont use pydantic
 
     return staff_list
 
@@ -543,7 +541,7 @@ async def create_workschedule(staff_workschedule_json: str = Form(...)):
     # add staff_id on work_schedule_data
     work_schedule_data['staff_id'] = staff_id
 
-    print(work_schedule_data)
+    # print(work_schedule_data)
 
     schedule = await Staff_WorkSchedule.create(**work_schedule_data)
 
