@@ -92,7 +92,7 @@ def fill_pdf_contract(staff):
     return [s3_read_url]
 
 
-def fill_pdf_sputum_training(staff, patient, date_entry, s3_document_path='uploads/companies/documents/'):
+def fill_pdf_sputum_training(staff, patient, institution, date_entry, s3_document_path='uploads/companies/documents/'):
     now = datetime.now()
     # formatted_now = now.strftime("_%Y%m%d_%H%M%S")  # Format the current time
     # Format the current time to year only suffix
@@ -112,9 +112,14 @@ def fill_pdf_sputum_training(staff, patient, date_entry, s3_document_path='uploa
     # doc_fields = {k: '' for k, v in contract_fields.items()}
 
     # address is concatenation of prefecture, municipality, town, building
+    
     staff_address = staff['prefecture'] + \
         staff['municipality'] + staff['town'] + staff['building']
-    staff_address.replace(" ", "")
+    staff_address.replace("　", "")
+
+    staff_postal_code = staff['postal_code']
+    #add '-' to postal code
+    staff_postal_code = f"{staff_postal_code[:3]}-{staff_postal_code[3:]}"
     staff_age = f"{staff['age']}歳"
     # the birth_date is like this, 1973-06-11 it should be formatted to this 1973年6月11日生まれ
     staff_birth_date = datetime.strptime(staff['birth_date'], '%Y-%m-%d')
@@ -133,8 +138,32 @@ def fill_pdf_sputum_training(staff, patient, date_entry, s3_document_path='uploa
     # remove T03:36:51.268Z
     date_entry = date_entry.strftime("%Y年%m月%d日")
 
+    # medical institution
+    mi_name = institution['medical_institution_name']
+    mi_address = f"{institution['medical_institution_address1']} {institution['medical_institution_address2']}"
+    mi_postal_code = institution['medical_institution_postal_code']
+    mi_poc = institution['medical_institution_poc']
+    mi_phone = institution['medical_institution_phone']
+    mi_fax = institution['medical_institution_fax']
+    mi_email = institution['medical_institution_email']
+    mi_type = institution['medical_institution_type']
+    licenses = institution['licenses']
+    license_number = institution['license_number']
+    date_obtained = institution['date_obtained']
+    ojt_implementation_name = institution['ojt_implementation_name']
+    physician_name_kanji = institution['physician_name_kanji']
+    physician_name_kana = institution['physician_name_kana']
+    physician_age = f"{institution['physician_age']}"
+    physician_birth_date = datetime.strptime(
+        institution['physician_birth_date'], '%Y-%m-%d')
+    physician_birth_date = physician_birth_date.strftime("%Y年%m月%d日")
+    physician_work = institution['physician_work']
+    entity_name = institution['entity_name']
+    entity_poc = institution['entity_poc']
+
     fields_dict = {
         "home_address": staff_address,
+        "postal_code": staff_postal_code,
         "english_name": staff['english_name'],
         "japanese_name": staff['japanese_name'],
         "age": staff_age,
@@ -144,7 +173,28 @@ def fill_pdf_sputum_training(staff, patient, date_entry, s3_document_path='uploa
         # "company_section_name": staff['affiliation'],
         "patient_address": patient_address,
         "patient_birth_date": patient_birth_date,
-        "current_date": date_entry
+        "current_date": date_entry,     # medical institution
+        # ,"medical_institution_license": licenses
+        "medical_institution_name": mi_name,
+        "medical_institution_address": mi_address,
+        "medical_institution_postal_code": mi_postal_code,
+        "medical_institution_poc": mi_poc,
+        "medical_institution_phone": mi_phone,
+        "medical_institution_fax": mi_fax,
+        "medical_institution_email": mi_email,
+        "medical_institution_type": mi_type,
+        "license_number": license_number,
+        "date_obtained": date_obtained,
+        "ojt_implementation_name": ojt_implementation_name,
+        "physician_name_kanji": physician_name_kanji,
+        "physician_name_kana": physician_name_kana,
+        "physician_age": physician_age,
+        "physician_birth_date": physician_birth_date,
+        "physician_work": physician_work,
+        "entity_name": entity_name,
+        "entity_poc": entity_poc
+
+
     }
 
     # print(fields_dict)

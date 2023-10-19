@@ -87,14 +87,14 @@ async def generate_document(details: str = Form(...)):
         raise HTTPException(status_code=400, detail="Invalid details")
 
     # details json contains staff and patient objects, with date created and document name
-    
+
     # generation of document differs with document name, so we have to check the document name
     if (details['document_name'] == 'docs_sputum_training'):
         # there are functions per document type in generate_pdf.py
         # print("here")
         generated_document = fill_pdf_sputum_training(
-            details['staff'], details['patient'], details['date_created'])
+            details['staff'], details['patient'], details['institution'], details['date_created'])
 
         return generated_document[0]
-    else: 
+    else:
         raise HTTPException(status_code=400, detail="Invalid document name")

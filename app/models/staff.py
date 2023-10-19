@@ -61,7 +61,7 @@ staff_pydantic = pydantic_model_creator(
 
 # create a pydantic that only takes id, english_name, japanese_name, staff_group, duty_type
 staffSelect_pydantic = pydantic_model_creator(Staff, name='StaffSelect', include=(
-    'id', 'english_name', 'japanese_name', 'affiliation', 'prefecture', 'municipality', 'town', 'building', 'duty_type', 'birth_date', 'gender'))
+    'id', 'english_name', 'japanese_name', 'affiliation', 'prefecture', 'municipality', 'town', 'building', 'postal_code', 'duty_type', 'birth_date', 'gender'))
 
 # staff_pydantic_in = pydantic_model_creato˝r(Staff, name='StaffIn', exclude_readonly=True)
 # staff_pydantic_out = pydantic_model_creator(Staff, name='StaffOut', exclude=('created_at', 'user_id', 'disabled'))

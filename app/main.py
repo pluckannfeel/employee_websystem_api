@@ -19,8 +19,10 @@ from app.routers.users import router as userRouter
 from app.routers.employees import router as employeeRouter
 from app.routers.staff import router as staffRouter
 from app.routers.patients import router as patientRouter
-from app.routers.japan_addresses import router as japanAddressesRouter
 from app.routers.companies import router as companyRouter
+from app.routers.medical_institutions import router as medicalInstitutionRouter
+from app.routers.japan_addresses import router as japanAddressesRouter
+
 
 from mangum import Mangum
 
@@ -47,8 +49,9 @@ initialize_db(app)
 # ROUTERS
 app.include_router(staffRouter)
 app.include_router(patientRouter)
-app.include_router(userRouter)
+app.include_router(medicalInstitutionRouter)
 app.include_router(companyRouter)
+app.include_router(userRouter)
 app.include_router(japanAddressesRouter)
 
 
@@ -105,17 +108,17 @@ app.add_middleware(
 
 #     # Example: List OneDrive files
 #     endpoint = f'https://graph.microsoft.com/v1.0/users/adf679a5-6a9f-40ba-ba57-ccfacd751745/drive/items/{test}/children/'
-    
+
 #     try:
 #         async with httpx.AsyncClient() as client:
 
 #             response = await client.get(endpoint, headers=headers)
-            
+
 #             files = response.json()
 #             return files
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=e)
-    
+
 # @app.post("/upload_to_onedrive")
 # async def upload_file(file: UploadFile = File(...)):
 #     access_token = get_access_token()
@@ -140,7 +143,7 @@ app.add_middleware(
 #     #         return {"message": "File uploaded successfully"}
 #     #     else:
 #     #         raise HTTPException(status_code=response.status_code, detail="OneDrive API request failed")
-        
+
 #     response = requests.put(endpoint, headers=headers, data=file_content)
 #     if response.status_code == 201:
 #         return {"message": "File uploaded successfully"}
@@ -154,4 +157,3 @@ async def main():
 
 # aws lambda
 handler = Mangum(app)
-

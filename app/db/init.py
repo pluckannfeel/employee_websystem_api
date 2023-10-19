@@ -22,7 +22,8 @@ def initialize_db(app):
                 'app.models.company',
                 'app.models.japan_addresses',
                 'app.models.patient',
-                'app.models.staff_workschedule'
+                'app.models.staff_workschedule',
+                'app.models.medical_institution',
             ]
         },
         generate_schemas=True,
