@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 
 def get_date_time_now():
@@ -39,3 +39,25 @@ def to_day_string(day: int) -> str:
         return '31st'
     else:
         return f'{day}th'
+
+
+def adjust_time(date, time_str):
+    # If the time is "24:00", adjust to "00:00" and add one day to the date
+    if time_str == "24:00":
+        adjusted_datetime = date + timedelta(days=1)
+        time_str = "00:00"
+    else:
+        adjusted_datetime = date
+
+    # Combine the adjusted date with the time
+    time = datetime.strptime(time_str, "%H:%M").time()
+    return datetime.combine(adjusted_datetime.date(), time)
+
+def convert_to_js_compatible_format(date_str):
+    # Parse the input date string
+    dt = datetime.fromisoformat(date_str)
+    
+    # Convert back to string in ISO format
+    js_compatible_date_str = dt.isoformat()
+    
+    return js_compatible_date_str

@@ -29,6 +29,7 @@ authlib = "*"
 pandas = "*"
 openpyxl = "*"
 xlsxwriter = "*"
+chardet = "*"
 
 [dev-packages]
 

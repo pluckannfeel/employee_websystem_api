@@ -13,7 +13,7 @@ from typing import List, Type
 from dotenv import load_dotenv
 from app.helpers.definitions import get_directory_path
 from app.helpers.s3_file_upload import upload_image_to_s3
-from app.helpers.generate_pdf import fill_pdf_sputum_training
+from app.helpers.generate_pdf import fill_pdf_sputum_training, fill_pdf_contract
 
 from tortoise.contrib.fastapi import HTTPNotFoundError
 
@@ -86,14 +86,16 @@ async def generate_document(details: str = Form(...)):
     if any(value is None for value in details.values()):
         raise HTTPException(status_code=400, detail="Invalid details")
 
-    # details json contains staff and patient objects, with date created and document name
-
     # generation of document differs with document name, so we have to check the document name
     if (details['document_name'] == 'docs_sputum_training'):
         # there are functions per document type in generate_pdf.py
         # print("here")
         generated_document = fill_pdf_sputum_training(
             details['staff'], details['patient'], details['institution'], details['date_created'])
+        
+    elif (details['document_name'] == 'mys_contract'):
+        generated_document = fill_pdf_contract(details['staff'])
+
 
         return generated_document[0]
     else:

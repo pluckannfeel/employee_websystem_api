@@ -12,6 +12,7 @@ class Staff(Model):
     staff_group = fields.CharField(
         max_length=128, null=True)  # ユーザーグループ 介護ヘルパー and 利用者
     staff_code = fields.CharField(max_length=64, null=True)
+    password_hash = fields.CharField(max_length=128, null=True)
     # added on sep 6
     japanese_name = fields.CharField(max_length=128, null=True)
     english_name = fields.CharField(max_length=128, null=True)
@@ -62,6 +63,3 @@ staff_pydantic = pydantic_model_creator(
 # create a pydantic that only takes id, english_name, japanese_name, staff_group, duty_type
 staffSelect_pydantic = pydantic_model_creator(Staff, name='StaffSelect', include=(
     'id', 'english_name', 'japanese_name', 'affiliation', 'prefecture', 'municipality', 'town', 'building', 'postal_code', 'duty_type', 'birth_date', 'gender'))
-
-# staff_pydantic_in = pydantic_model_creato˝r(Staff, name='StaffIn', exclude_readonly=True)
-# staff_pydantic_out = pydantic_model_creator(Staff, name='StaffOut', exclude=('created_at', 'user_id', 'disabled'))

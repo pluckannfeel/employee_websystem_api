@@ -22,8 +22,10 @@ def initialize_db(app):
                 'app.models.company',
                 'app.models.japan_addresses',
                 'app.models.patient',
-                'app.models.staff_workschedule',
                 'app.models.medical_institution',
+                'app.models.staff_shift',
+                'app.models.shift_report',
+                'app.models.leave_request',
             ]
         },
         generate_schemas=True,
