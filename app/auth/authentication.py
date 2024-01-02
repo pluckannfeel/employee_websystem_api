@@ -106,8 +106,10 @@ async def authenticate_user(username_or_email: str, input_password: str):
 
 async def authenticate_staff(staff_code: str, input_password: str):
     # user = await User.get(Q(username=username_or_email) | Q(email=username_or_email))
-    staff = await Staff.get(staff_code=staff_code, password_hash=input_password)
-
+    try:
+        staff = await Staff.get(staff_code=staff_code, password_hash=input_password)
+    except:
+        return False
     # this will be important later on as we will hash the password of the staff too for login
     # however for testing purposes we dont need it yet, we will input the password manually for now
     # is_authenticated = password_hash_context.verify(

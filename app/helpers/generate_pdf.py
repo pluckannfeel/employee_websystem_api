@@ -88,6 +88,57 @@ def fill_pdf_contract(staff, s3_document_path='uploads/companies/documents/'):
     print(s3_read_url)
     return [s3_read_url]
 
+def fill_pdf_pledge(staff, s3_document_path='uploads/companies/documents/'):
+    staff_name = staff['english_name']
+    now = datetime.now()
+    # formatted_now = now.strftime("_%Y%m%d_%H%M%S")  # Format the current time
+    # Format the current time to year only suffix
+    formatted_now = now.strftime("_%Y")
+
+    new_contract_name = staff_name.replace(" ", "") + formatted_now + '.pdf'
+
+    # s3_original_contract = 'uploads/staff/contracts/mys_contract.pdf'
+    s3_new_contract = s3_document_path + new_contract_name
+
+    original_file = os.path.join(STATIC_DIR, "mys_pledge.pdf")
+
+    # contract_fields = fillpdfs.get_form_fields(original_file)
+    # change all values from None to ""
+    # contract_fields = {k: '' if v is None or "" else v for k, v in contract_fields.items()}
+
+    # convert all values to string
+    # contract_fields = {k: '' for k, v in contract_fields.items()}
+    # contract_fields['staff_name'] = str(staff_name)
+
+    staff_name = staff['english_name']
+
+    fields = {
+        "staff_name": staff_name,
+    }
+
+    with TemporaryDirectory() as temp_dir:
+        temp_file_path = os.path.join(temp_dir, new_contract_name)
+
+        # Create a new BytesIO buffer for the filled PDF
+        new_contract_buffer = BytesIO()
+        fillpdfs.write_fillable_pdf(original_file, new_contract_buffer, fields)
+
+        # Write the filled PDF to the temporary directory
+        with open(temp_file_path, 'wb') as temp_file:
+            temp_file.write(new_contract_buffer.getvalue())
+
+        # upload to one drive
+        # upload_file_to_onedrive(new_contract_buffer, new_contract_name)
+
+        # Upload the filled PDF to S3 with the new name
+        s3.upload_file(temp_file_path, Bucket=bucket_name, Key=s3_new_contract, ExtraArgs={
+                       'ACL': 'public-read', 'ContentType': 'application/pdf'})
+
+    s3_read_url = generate_s3_url(s3_new_contract, 'read')
+
+    print(s3_read_url)
+    return [s3_read_url]
+
 
 def fill_pdf_sputum_training(staff, patient, institution, date_entry, s3_document_path='uploads/companies/documents/'):
     now = datetime.now()

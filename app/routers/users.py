@@ -75,12 +75,12 @@ s3_upload_path = str(os.getenv("AWS_PPS_STORAGE_URI")) + 'uploads'
 
 #     return user_info
 
-@router.get("", tags=["Users"], name="Get all users")
+@router.get("", name="Get all users")
 async def get_users():
     return await user_pydantic.from_queryset(User.all())
 
 
-@router.get("/get_user_info", tags=["Users"], name="Get user info")
+@router.get("/get_user_info", name="Get user info")
 async def get_user_info(token: str):
     # token = await token_generator('millanjarvis421@gmail.com', 'Sivrajnallim96')
     user = await verify_token_email(token)
@@ -96,7 +96,7 @@ async def get_user_info(token: str):
     return user
 
 
-@router.get("/{email}", tags=["Users"], name="Get user by email", responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
+@router.get("/{email}", name="Get user by email", responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
 async def read_user(email: str):
     # return await user_pydantic.from_queryset_single(User.get(email=email))
     # get user credentials by email
@@ -107,7 +107,7 @@ async def read_user(email: str):
     return user_info
 
 
-@router.get("/verification", tags=["Users"], name="Verify User", responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
+@router.get("/verification", name="Verify User", responses={status.HTTP_404_NOT_FOUND: {"model": HTTPNotFoundError}})
 async def verify_user(token: str):  # request: Request,
     user = await verify_token_email(token)
     print("user object ", user)
@@ -125,7 +125,7 @@ async def verify_user(token: str):  # request: Request,
     )
 
 
-@router.post("/register", tags=["Users"], status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def create_user(user: CreateUser) -> dict:
     # if you use user_pydantic_
     # user: userIn_pydantic
@@ -165,7 +165,7 @@ async def create_user(user: CreateUser) -> dict:
     return {'user': new_user, 'msg': "new user created."}
 
 
-# @router.get("/check_user_info", tags=["Users"], status_code=status.HTTP_200_OK)
+# @router.get("/check_user_info", , status_code=status.HTTP_200_OK)
 # async def check_user_credentials(token: str) -> dict:
 #     # key - token
 #     user = await verify_token_email(token)
@@ -215,7 +215,7 @@ async def create_user(user: CreateUser) -> dict:
 #     return user_data
 
 
-# @router.get("/get_user_info", tags=["Users"])
+# @router.get("/get_user_info", )
 # async def get_user_info(token: str) -> dict:
 #     print("get user info log")
 #     # Verify the token and extract user email
@@ -283,7 +283,7 @@ async def create_user(user: CreateUser) -> dict:
     # return user_data
 
 
-@router.post("/login", tags=["Users"], status_code=status.HTTP_200_OK)
+@router.post("/login", status_code=status.HTTP_200_OK)
 async def login_user(login_info: CreateUserToken) -> dict:
     token = await token_generator(login_info.email, login_info.password)
 
@@ -300,7 +300,7 @@ async def login_user(login_info: CreateUserToken) -> dict:
 # update user info
 
 
-@router.put('/update_user_info', status_code=status.HTTP_200_OK, tags=["Users"])
+@router.put('/update_user_info', status_code=status.HTTP_200_OK, )
 async def update_user(user_id: str, user: UpdateUserInfo):
 
     user_data = user.dict(exclude_unset=True)
@@ -328,7 +328,7 @@ async def update_user(user_id: str, user: UpdateUserInfo):
     return updated_user_info
 
 
-@router.put("/change_password", tags=["Users"], status_code=status.HTTP_200_OK)
+@router.put("/change_password", status_code=status.HTTP_200_OK)
 async def change_user_password(user_info: ChangeUserPassword) -> dict:
     user = await User.get(email=user_info.email)
     if not user:

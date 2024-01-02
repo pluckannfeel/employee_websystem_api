@@ -1,10 +1,11 @@
 # FastAPI
 from tokenize import String
 from urllib.request import Request
-from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Request
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 import requests
+import json
 
 # cors headers
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,7 @@ from app.helpers.datetime import get_date_time_now
 from app.db.init import initialize_db
 
 # routers
+# routers
 from app.routers.users import router as userRouter
 from app.routers.employees import router as employeeRouter
 from app.routers.staff import router as staffRouter
@@ -23,6 +25,15 @@ from app.routers.companies import router as companyRouter
 from app.routers.medical_institutions import router as medicalInstitutionRouter
 from app.routers.japan_addresses import router as japanAddressesRouter
 from app.routers.shift_report import router as reportRouter
+from app.routers.notifications import router as notificationRouter
+from app.routers.payslip import router as payslipRouter
+
+# websockets
+from app.ws.connection_manager import manager as ws_manager
+from urllib.parse import parse_qs, urlparse
+
+# auth
+from app.auth.authentication import verify_token_staff_code, verify_token_email
 
 
 from mangum import Mangum
@@ -55,14 +66,65 @@ app.include_router(medicalInstitutionRouter)
 app.include_router(companyRouter)
 app.include_router(userRouter)
 app.include_router(japanAddressesRouter)
+app.include_router(notificationRouter)
+app.include_router(payslipRouter)
+
+# @app.websocket("/ws/notifications")
+# async def websocket_endpoint(websocket: WebSocket):
+#     try:
+#         # Accept the WebSocket connection
+#         # await websocket.accept()
+
+#         # You can still parse and use the query parameters as needed
+#         parsed_url = urlparse(str(websocket.url))
+#         query_params = parse_qs(parsed_url.query)
+#         token = query_params.get("token", ["anonymous"])[0]
+#         client = query_params.get("client", ["web"])[0]
+
+#         # Authentication and user identification logic
+#         # Note: The logic here will depend on your application's specific requirements
+#         if client == "mobile":
+#             # user = await verify_token_staff_code(token)
+#             user = "anonymous"
+#         elif client == "web":
+#             user = await verify_token_email(token)
+#         else:
+#             raise HTTPException(status_code=400, detail="Invalid client type")
+
+#         # Connect the user to the WebSocket
+#         await ws_manager.connect(websocket)
+
+#         try:
+#             while True:
+#                 # Here you handle incoming messages
+#                 data = await websocket.receive_text()
+#                 print(f"Received message: {data}")
+#                 # Example: Echo the received message back to the sender
+#                 await ws_manager.send_personal_message(f"Echo: {data}", websocket)
+#         except WebSocketDisconnect:
+#             print(f"User disconnected: {user.id if user else 'anonymous'}")
+#             # Disconnect the user from WebSocket
+#             ws_manager.disconnect(websocket)
+#             # Optionally broadcast a message to all users
+#             await ws_manager.broadcast(json.dumps({"type": "user.online", "user_id": user.id if user else 'anonymous'}))
+
+#     except Exception as e:
+#         print(f"Error during WebSocket connection: {e}")
+#         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
 
 
 origins = [
-    '*',
+    # '*',
     # "http://localhost",
     # 'http://localhost:8080',
-    # 'http://localhost:3000',
-    # 'http://localhost:3000/employee-web-system'
+    'http://localhost:3000',
+    'http://localhost:3000/admin',
+    'https://mirai-cares.com',
+    'https://mirai-cares.com/admin',
+    'https://www.mirai-cares.com',
+    'https://www.mirai-cares.com/admin',
+    'https://test-deploy.d39ugbo3miv16m.amplifyapp.com/',
+    'https://test-deploy.d39ugbo3miv16m.amplifyapp.com/admin',
 ]
 
 # middlewares

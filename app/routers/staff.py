@@ -5,7 +5,7 @@ import re
 import chardet
 import calendar
 import pandas as pd
-import pytz
+import requests
 
 from typing import List, Type
 from datetime import datetime, timedelta, timezone
@@ -29,6 +29,9 @@ from app.helpers.zipfile import zipfiles
 from app.helpers.generate_pdf import fill_pdf_contract
 from app.helpers.onedrive import read_from_onedrive, upload_file_to_onedrive
 from app.helpers.datetime import adjust_time
+
+# notifications
+from app.routers.notifications import create_and_broadcast_notification
 
 # s3
 from app.helpers.s3_file_upload import upload_file_to_s3, generate_s3_url, upload_image_to_s3, is_file_exists
@@ -332,9 +335,11 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
         # print("s3_read_url: ", s3_read_url)
 
-    # object for bank card images, if the bank_card_images is empty, we will create a new dict
-    bank_card_images = staff_data['bank_card_images'] if staff_data['bank_card_images'] != '' else {
-    }
+    #check if staff_data['bank_card_images'] exists
+    if 'bank_card_images' in staff_data:
+
+        # object for bank card images, if the bank_card_images is empty, we will create a new dict
+        bank_card_images = staff_data['bank_card_images'] if staff_data['bank_card_images'] != ''  else {}
 
     if bank_card_front is not None:
         bank_card_front_name = staff_data['english_name'].split(
@@ -361,7 +366,8 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         bank_card_images['back'] = card_back_read_url
 
     # stringify bank_card_images
-    staff_data['bank_card_images'] = json.dumps(bank_card_images)
+    if 'bank_card_images' in staff_data:
+        staff_data['bank_card_images'] = json.dumps(bank_card_images)
 
     # residence card front and back
     if residence_card_front is not None:
@@ -392,8 +398,8 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         staff_data['residence_card_details']['back'] = card_back_read_url
 
     # append
-    staff_data['residence_card_details'] = json.dumps(
-        staff_data['residence_card_details'])
+    if 'residence_card_details' in staff_data:
+        staff_data['residence_card_details'] = json.dumps(staff_data['residence_card_details'])
 
     # passport details with file
     if passport_file is not None:
@@ -409,13 +415,17 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         staff_data['passport_details']['file'] = passport_read_url
 
     # append
-    staff_data['passport_details'] = json.dumps(staff_data['passport_details'])
+    if 'passport_details' in staff_data:
+        staff_data['passport_details'] = json.dumps(staff_data['passport_details'])
 
     staff_data_copy = staff_data.copy()
 
     staff_data_copy.pop('id')
 
     # update staff
+
+    # print(staff_data_copy)
+
     await Staff.filter(id=staff_data['id']).update(**staff_data_copy)
 
     updated_staff = await staff_pydantic.from_queryset_single(Staff.get(id=staff_data['id']))
@@ -584,16 +594,24 @@ async def get_all_schedule():
 @router.get("/shift_by_staff")
 # async def get_staff(user_email_token: str, staff_group: str):
 async def get_schedule_by_staff(staff_name: str):
-    # shifts = await Staff_Shift.filter(Q(start__month=datetime.now().month) & Q(staff__icontains=staff_name)).values()
     shifts = await Staff_Shift.filter(start__month=datetime.now().month, staff__icontains=staff_name).values("id", "staff", "patient", "service_type", "service_details", "start", "end", "duration")
 
-    # convert start and end to js date format
-    # Convert start and end to JavaScript date format
-    # for shift in shifts:
-    #     shift['start'] = shift['start'].isoformat() if shift['start'] else None
-    #     shift['end'] = shift['end'].isoformat() if shift['end'] else None
-
     return shifts
+
+
+@router.get("/upcoming_shift_by_staff")
+async def get_latest_shift_by_staff(staff_name: str):
+    # Get the current time
+    current_time = datetime.now()
+
+    # Query for the next shift for the given staff that starts after the current time
+    # It will fetch the nearest future shift irrespective of the date
+    next_shift = await Staff_Shift.filter(staff__icontains=staff_name, start__gte=current_time).order_by('start').first()
+
+    if next_shift:
+        return next_shift
+    else:
+        return {}
 
 # ============================= STAFF SHIFT HTTP ENDPOINT ============================= #
 
@@ -824,6 +842,20 @@ async def create_staff_leave_request(leave_request_json: str = Form(...)):
 
     leave_request = await Leave_Request.create(**leave_request_data)
 
+    # get staff info by id
+    staff_info = await Staff.get(id=staff['id']).values('english_name', 'japanese_name', 'staff_code')
+
+    # notification param object
+    notification = {
+        # "person": leave_request_data['staff']
+        "staff": staff_info,
+        # "mys_id": leave_request_data['mys_id'],
+        "subject": "Leave Request Created",
+    }
+
+    # create notifications
+    await create_and_broadcast_notification("leaveRequest", json.dumps(notification))
+
     new_leave_request = await leave_request_pydantic.from_tortoise_orm(leave_request)
 
     return new_leave_request
@@ -835,12 +867,27 @@ async def update_staff_leave_request(leave_request_json: str = Form(...)):
 
     leave_request_id = leave_request_data.pop('id', None)
     leave_request_staff = leave_request_data.pop('staff', None)
+    staff_code = leave_request_staff['staff_code']
 
     if leave_request_id is None:
         raise ValueError("The 'id' field is required.")
 
     # Update leave request
     await Leave_Request.filter(id=leave_request_id).update(status=leave_request_data['status'])
+
+    # print(staff_code)
+
+    # notification param object
+    notification = {
+        # "person": leave_request_data['staff']
+        # "staff": leave_request_staff,
+        # "mys_id": leave_request_data['mys_id'],
+        "subject": "Leave Request Updated",
+        "status": leave_request_data['status'],
+    }
+
+    # # create notifications
+    await create_and_broadcast_notification("updateLeaveRequest", json.dumps(notification), recipient=staff_code)
 
     updated_leave_request = await leave_request_pydantic.from_queryset_single(Leave_Request.get(id=leave_request_id))
 
@@ -854,5 +901,16 @@ async def update_staff_leave_request(leave_request_json: str = Form(...)):
 @router.delete('/delete_leave_request/{id}')
 async def delete_staff_leave_request(id: str):
     await Leave_Request.filter(id=id).delete()
+
+    # # notification param object
+    # notification = {
+    #     # "person": leave_request_data['staff']
+    #     "staff": leave_request_staff,
+    #     # "mys_id": leave_request_data['mys_id'],
+    #     "subject": "Leave Request Updated",
+    # }
+
+    # # create notifications
+    # await create_and_broadcast_notification("deleteLeaveRequest", json.dumps(notification))
 
     return id

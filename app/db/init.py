@@ -26,6 +26,9 @@ def initialize_db(app):
                 'app.models.staff_shift',
                 'app.models.shift_report',
                 'app.models.leave_request',
+                'app.models.notification',
+                'app.models.staff_payslip',
+                'app.models.device_token'
             ]
         },
         generate_schemas=True,
