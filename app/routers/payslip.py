@@ -1,11 +1,12 @@
 # fast api
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, status, HTTPException, File, Form, UploadFile, Response, Query, Body
 from fastapi.responses import JSONResponse, FileResponse
 from typing import List
 
 from app.models.staff_payslip import Staff_Payslip, staff_payslip_pydantic
+from app.models.staff_shift import Staff_Shift
 from app.models.staff import Staff, staff_pydantic
 
 from typing import Optional
@@ -119,8 +120,33 @@ async def create_payslip(payslip_json: str = Form(...), payslip_file: UploadFile
 @router.delete("/delete_payslip")
 async def delete_payslip(payslip_ids: List[str] = Form(...)):
     deleted_payslips = await Staff_Payslip.filter(id__in=payslip_ids).delete()
-    
+
     if deleted_payslips == 0:
         raise HTTPException(status_code=404, detail="Payslips not found")
 
     return {"deleted_payslip_ids": payslip_ids}
+
+
+# staff salary calculation part
+# @router.get("/calculate_salary/{mys_id}")
+# async def calculate_salary(mys_id: str):
+#     # Calculate the first and last day of the current month
+#     today = datetime.today()
+#     first_day_of_month = today.replace(day=1)
+#     next_month = first_day_of_month.replace(
+#         day=28) + timedelta(days=4)  # this will never fail
+#     last_day_of_month = next_month - timedelta(days=next_month.day)
+
+#     query = f"""
+#     SELECT staff, ROUND(SUM(CAST(REPLACE(duration, '分', '') AS INTEGER)) / 60.0, 1) AS total_work_hours
+#     FROM staff_shift
+#     WHERE start >= '{first_day_of_month}' AND start < '{last_day_of_month + timedelta(days=1)}'
+#     GROUP BY staff
+#     """
+
+#     # total_work_hours = await Staff_Shift.raw(query)
+#     total_work_hours = await Staff_Shift.raw(query)
+
+#     # Assuming the raw() method returns a list of tuples (staff_name, total_work_hours)
+#     for entry in total_work_hours:
+#         print(f"{entry[0]} - {entry[1]} hours")

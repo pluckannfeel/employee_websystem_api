@@ -49,7 +49,7 @@ async def get_patients():
 async def get_patient_select():
 
     # same as staff but only take id, english_name, japanese_name, staff_group, duty_type
-    patient = Patient.all()
+    patient = Patient.filter(data_disabled=False).all()
 
     patient_list = await patientSelect_pydantic.from_queryset(patient)
 

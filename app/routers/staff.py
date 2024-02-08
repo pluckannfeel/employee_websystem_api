@@ -6,9 +6,10 @@ import chardet
 import calendar
 import pandas as pd
 import requests
+import pytz
 
 from typing import List, Type
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time
 
 # env
 from dotenv import load_dotenv
@@ -29,6 +30,7 @@ from app.helpers.zipfile import zipfiles
 from app.helpers.generate_pdf import fill_pdf_contract
 from app.helpers.onedrive import read_from_onedrive, upload_file_to_onedrive
 from app.helpers.datetime import adjust_time
+from app.helpers.calculations import calculate_night_hours, calculate_single_night_shift, is_holiday
 
 # notifications
 from app.routers.notifications import create_and_broadcast_notification
@@ -39,6 +41,7 @@ from app.helpers.datetime import convert_to_js_compatible_format
 
 # schema
 from app.models.staff_schema import StaffLicense, LicenseData, StaffLoginCredentials
+from app.models.email_schema import EmailDetails
 
 from tempfile import NamedTemporaryFile
 
@@ -47,6 +50,8 @@ from app.auth.authentication import hash_password, staff_token_generator, verify
 
 
 from tortoise.expressions import Q
+from tortoise.functions import Sum, Count
+
 
 # one drive
 # from app.helpers.onedrive import get_access_token
@@ -77,7 +82,7 @@ async def get_staff(staff_group: str):
     # for more security later, we can use the user id instead of email
     # user_email = verify_token_email(user_email_token)
 
-    staff = Staff.filter(disabled=False, zaishoku_joukyou__not="退社済").order_by(
+    staff = Staff.filter(disabled=False).exclude(Q(zaishoku_joukyou__icontains="退職") | Q(zaishoku_joukyou__icontains="退社済")).order_by(
         'staff_code').all()
 
     staff_list = await staff_pydantic.from_queryset(staff)
@@ -137,7 +142,8 @@ async def get_staff_info(token: str):
 async def get_staff_select():
 
     # same as staff but only take id, english_name, japanese_name, staff_group, duty_type
-    staff = Staff.filter(disabled=False).exclude(zaishoku_joukyou="退社済").all()
+    staff = Staff.filter(disabled=False).exclude(Q(zaishoku_joukyou__icontains="退職") | Q(zaishoku_joukyou__icontains="退社済")).order_by(
+        'staff_code').all()
 
     staff_list = await staffSelect_pydantic.from_queryset(staff)
 
@@ -335,11 +341,12 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
         # print("s3_read_url: ", s3_read_url)
 
-    #check if staff_data['bank_card_images'] exists
+    # check if staff_data['bank_card_images'] exists
     if 'bank_card_images' in staff_data:
 
         # object for bank card images, if the bank_card_images is empty, we will create a new dict
-        bank_card_images = staff_data['bank_card_images'] if staff_data['bank_card_images'] != ''  else {}
+        bank_card_images = staff_data['bank_card_images'] if staff_data['bank_card_images'] != '' else {
+        }
 
     if bank_card_front is not None:
         bank_card_front_name = staff_data['english_name'].split(
@@ -399,7 +406,13 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
     # append
     if 'residence_card_details' in staff_data:
-        staff_data['residence_card_details'] = json.dumps(staff_data['residence_card_details'])
+        # append residence_card_number
+        # if 'residence_card_number' in staff_data:
+        #     # add the number to the residence_card_details dict
+        #     staff_data['residence_card_details']['number'] = staff_data['residence_card_number']
+
+        staff_data['residence_card_details'] = json.dumps(
+            staff_data['residence_card_details'])
 
     # passport details with file
     if passport_file is not None:
@@ -416,11 +429,23 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
 
     # append
     if 'passport_details' in staff_data:
-        staff_data['passport_details'] = json.dumps(staff_data['passport_details'])
+        # append passport_number
+        # if 'passport_number' in staff_data:
+        #     # add the number to the passport_details dict
+        #     staff_data['passport_details']['number'] = staff_data['passport_number']
+
+        staff_data['passport_details'] = json.dumps(
+            staff_data['passport_details'])
 
     staff_data_copy = staff_data.copy()
 
     staff_data_copy.pop('id')
+    # new jan 29 2024 #temporarily added passport_number and residence_card_number individually pop the two of them but check if each of them exists
+    # if 'passport_number' in staff_data_copy:
+    #     staff_data_copy.pop('passport_number')
+
+    # if 'residence_card_number' in staff_data_copy:
+    #     staff_data_copy.pop('residence_card_number')
 
     # update staff
 
@@ -436,6 +461,129 @@ async def update_staff(staff_json: str = Form(...), staff_image: UploadFile = Fi
         updated_staff.licenses = json.loads(updated_staff.licenses)
     else:
         updated_staff.licenses = []
+
+    updated_staff.bank_card_images = json.loads(
+        updated_staff.bank_card_images)
+
+    updated_staff.residence_card_details = json.loads(
+        updated_staff.residence_card_details)
+
+    updated_staff.passport_details = json.loads(
+        updated_staff.passport_details)
+
+    return updated_staff
+
+# add documents in staff
+
+
+@router.put("/add_document")
+async def add_document_staff(staff_id: str = Form(...), document_type: str = Form(...), document_image: UploadFile = File(None)):
+    allowed_document_types = ['bank_card_front', 'bank_card_back',
+                              'residence_card_back', 'residence_card_front', 'passport']
+
+    if document_type not in allowed_document_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid document type.",
+        )
+
+    now = datetime.now()
+    # if the document type is bank_card
+    if document_type == 'bank_card_front':
+        document_name = now.strftime(
+            "_front_%Y%m%d_%H%M%S") + '.' + document_image.filename.split('.')[-1]
+        s3_document_path = s3_staffbankcard_upload_folder + document_name
+        uploaded_file = upload_image_to_s3(
+            document_image, document_name, "bank_img")
+        document_read_url = generate_s3_url(s3_document_path, 'read')
+
+        # add the url to the bank_card_images dict make sure it is json friendly
+        bank_card_images = await Staff.get(id=staff_id).values('bank_card_images')
+        bank_card_images = json.loads(bank_card_images['bank_card_images'])
+
+        bank_card_images['front'] = document_read_url
+
+        # stringify bank_card_images
+        bank_card_images = json.dumps(bank_card_images)
+
+        await Staff.filter(id=staff_id).update(bank_card_images=bank_card_images)
+    elif document_type == 'bank_card_back':
+        document_name = now.strftime(
+            "_back_%Y%m%d_%H%M%S") + '.' + document_image.filename.split('.')[-1]
+        s3_document_path = s3_staffbankcard_upload_folder + document_name
+        uploaded_file = upload_image_to_s3(
+            document_image, document_name, "bank_img")
+        document_read_url = generate_s3_url(s3_document_path, 'read')
+
+        # add the url to the bank_card_images dict make sure it is json friendly
+        bank_card_images = await Staff.get(id=staff_id).values('bank_card_images')
+        bank_card_images = json.loads(bank_card_images['bank_card_images'])
+
+        bank_card_images['back'] = document_read_url
+
+        # stringify bank_card_images
+        bank_card_images = json.dumps(bank_card_images)
+
+        await Staff.filter(id=staff_id).update(bank_card_images=bank_card_images)
+    elif document_type == 'residence_card_front':
+        document_name = now.strftime(
+            "_front_%Y%m%d_%H%M%S") + '.' + document_image.filename.split('.')[-1]
+        s3_document_path = s3_staffresidencecard_upload_folder + document_name
+        uploaded_file = upload_image_to_s3(
+            document_image, document_name, "residencecard_img")
+        document_read_url = generate_s3_url(s3_document_path, 'read')
+
+        # add the url to the residence_card_details dict make sure it is json friendly
+        residence_card_details = await Staff.get(id=staff_id).values('residence_card_details')
+        residence_card_details = json.loads(
+            residence_card_details['residence_card_details'])
+
+        residence_card_details['front'] = document_read_url
+
+        # stringify residence_card_details
+        residence_card_details = json.dumps(residence_card_details)
+
+        await Staff.filter(id=staff_id).update(residence_card_details=residence_card_details)
+    elif document_type == 'residence_card_back':
+        document_name = now.strftime(
+            "_back_%Y%m%d_%H%M%S") + '.' + document_image.filename.split('.')[-1]
+        s3_document_path = s3_staffresidencecard_upload_folder + document_name
+        uploaded_file = upload_image_to_s3(
+            document_image, document_name, "residencecard_img")
+        document_read_url = generate_s3_url(s3_document_path, 'read')
+
+        # add the url to the residence_card_details dict make sure it is json friendly
+        residence_card_details = await Staff.get(id=staff_id).values('residence_card_details')
+        residence_card_details = json.loads(
+            residence_card_details['residence_card_details'])
+
+        residence_card_details['back'] = document_read_url
+
+        # stringify residence_card_details
+        residence_card_details = json.dumps(residence_card_details)
+
+        await Staff.filter(id=staff_id).update(residence_card_details=residence_card_details)
+    elif document_type == 'passport':
+        document_name = now.strftime(
+            "_passport_%Y%m%d_%H%M%S") + '.' + document_image.filename.split('.')[-1]
+        s3_document_path = s3_staffpassport_upload_folder + document_name
+        uploaded_file = upload_image_to_s3(
+            document_image, document_name, "passport_img")
+        document_read_url = generate_s3_url(s3_document_path, 'read')
+
+        # add the url to the passport_details dict
+        passport_details = await Staff.get(id=staff_id).values('passport_details')
+        passport_details = json.loads(passport_details['passport_details'])
+
+        passport_details['file'] = document_read_url
+
+        # stringify passport_details
+        passport_details = json.dumps(passport_details)
+
+        await Staff.filter(id=staff_id).update(passport_details=passport_details)
+
+    # get the updated staff
+    updated_staff = await staff_pydantic.from_queryset_single(Staff.get(id=staff_id))
 
     updated_staff.bank_card_images = json.loads(
         updated_staff.bank_card_images)
@@ -570,23 +718,38 @@ async def get_all_schedule():
 
     # shifts = await Staff_Shift.all().values()
     # filter shift list by current month only
-    shifts = await Staff_Shift.filter(start__month=datetime.now().month).values()
+    # shifts = await Staff_Shift.filter(start__month=datetime.now().month).values()
 
-    # Convert 'start' and 'end' to timestamps in milliseconds
-    # for shift in shifts:
-    #     shift['start'] = int(shift['start'].timestamp() *
-    #                          1000) if shift['start'] else None
-    #     shift['end'] = int(shift['end'].timestamp() *
-    #                        1000) if shift['end'] else None
+    # timezone = pytz.UTC
+    now = datetime.now()
 
-    # japan_timezone = pytz.timezone('Asia/Tokyo')
+    # First day of the current month
+    first_day_of_current_month = datetime(now.year, now.month, 1,
+                                          #   tzinfo=timezone
+                                          )
 
-    # print(shifts[0])
+    # First day of the month after the next month
+    if now.month == 12:
+        first_day_of_month_after_next = datetime(now.year + 1, 2, 1,
+                                                 #  tzinfo=timezone
+                                                 )
+    else:
+        first_day_of_month_after_next = datetime(now.year + (now.month // 12), now.month % 12 + 2, 1,
+                                                 #  tzinfo=timezone
+                                                 )
 
-    # Convert 'start' and 'end' to Japan timezone and timestamps in milliseconds
-    # for shift in shifts:
-    #     shift['start'] = int(shift['start'].astimezone(japan_timezone).timestamp() * 1000) if shift['start'] else None
-    #     shift['end'] = int(shift['end'].astimezone(japan_timezone).timestamp() * 1000) if shift['end'] else None
+    # Last day of the next month (one second before the first day of the month after next)
+    last_day_of_next_month = first_day_of_month_after_next - \
+        timedelta(seconds=1)
+
+    # Fetch shifts for the current and next month
+    # shifts = await Staff_Shift.filter(
+    #     Q(start__gte=first_day_of_current_month) & Q(
+    #         start__lt=first_day_of_month_after_next)
+    # ).values()
+
+    # get all shifts
+    shifts = await Staff_Shift.all().values()
 
     return shifts
 
@@ -594,7 +757,26 @@ async def get_all_schedule():
 @router.get("/shift_by_staff")
 # async def get_staff(user_email_token: str, staff_group: str):
 async def get_schedule_by_staff(staff_name: str):
-    shifts = await Staff_Shift.filter(start__month=datetime.now().month, staff__icontains=staff_name).values("id", "staff", "patient", "service_type", "service_details", "start", "end", "duration")
+
+    # timezone = pytz.UTC
+    now = datetime.now()
+
+    # First day of the current month
+    first_day_of_current_month = datetime(now.year, now.month, 1)
+
+    # First day of the month after the next month
+    if now.month == 12:
+        first_day_of_month_after_next = datetime(now.year + 1, 2, 1)
+    else:
+        first_day_of_month_after_next = datetime(
+            now.year + (now.month // 12), now.month % 12 + 2, 1)
+
+    # Last day of the next month (one second before the first day of the month after next)
+    last_day_of_next_month = first_day_of_month_after_next - \
+        timedelta(seconds=1)
+
+    # shifts = await Staff_Shift.filter(start__month=datetime.now().month, staff__icontains=staff_name).values("id", "staff", "patient", "service_type", "service_details", "start", "end", "duration")
+    shifts = await Staff_Shift.filter(Q(start__gte=first_day_of_current_month) & Q(start__lt=first_day_of_month_after_next), staff__icontains=staff_name).values("id", "staff", "patient", "service_type", "service_details", "start", "end", "duration")
 
     return shifts
 
@@ -765,10 +947,498 @@ async def delete_shift(id: str):
 
     return id
 
+# shift confirmation by email
+
+
+@router.post('/confirm_shift')
+async def confirm_shift(email: EmailDetails):
+    pass
+
+
+def duration_str_to_minutes(duration_str):
+    try:
+        hours, minutes = map(int, duration_str.split(':'))
+        return hours * 60 + minutes
+    except ValueError:
+        # Log the error or handle it as needed
+        print(f"Invalid duration format: '{duration_str}'")
+        return 0
+
+# get the total number of work hours of shift
+
+
+@router.get('/total_work_hours')
+async def get_total_work_hours():
+    # get all shifts duration of the staff of the start column which in current month and with service types that has only value of 重訪Ⅰ, 重訪Ⅱ, 重訪Ⅲ
+    # Assuming your server is set to the same timezone as your database
+
+    timezone = pytz.UTC
+    now = datetime.now(timezone)
+
+    first_day_of_month = datetime(now.year, now.month, 1, tzinfo=timezone)
+
+    # Handling the increment of the month
+    if now.month == 12:
+        last_day_of_month = datetime(
+            now.year + 1, 1, 1, tzinfo=timezone) - timedelta(seconds=1)
+    else:
+        last_day_of_month = datetime(
+            now.year, now.month + 1, 1, tzinfo=timezone) - timedelta(seconds=1)
+
+    # Debug: print the actual filter range
+    # print(f"Filtering from {first_day_of_month} to {last_day_of_month}")
+
+   # Now filter using the range
+    durations = await Staff_Shift.filter(
+        start__gte=first_day_of_month,
+        start__lte=last_day_of_month,
+        service_details__in=['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']
+    ).values_list('duration', flat=True)
+
+    # Summing the total minutes
+    total_minutes = sum(int(d) for d in durations if d.isdigit())
+
+    # Converting total minutes to hours
+    total_hours = total_minutes / 60  # Use / for a floating-point result
+
+    return {"total_hours": total_hours}
+
+
+@router.post('/staff_current_records')
+async def get_staff_current_records(staff_code: str, selected_date: str):
+    # this will show records of the staff that are currently working :
+    # Total Work hours based on Selected Month
+    # Total Night Work hours based on Selected Month
+    # Total Holiday Work hours based on Selected Month
+    # (later) Total Transporation cost based on Selected Month
+
+    # get the staff 'japanese name' by staff_code
+    staff = await Staff.get(staff_code=staff_code, leave_date=None).values('japanese_name')
+
+    # convert selected_date string to date object dont format it just make it into datetime
+    # selected_date = datetime.strptime(selected_date, '%Y-%m-%d')
+    # Split the string and convert year and month to integers
+    year, month = map(int, selected_date.split('-'))
+    selected_date = datetime(year, month, 1)
+
+    # get the first and last day of the month
+    timezone = pytz.UTC
+
+    first_day_of_month = datetime(
+        selected_date.year, selected_date.month, 1, tzinfo=timezone)
+
+    # Handling the increment of the month
+    if selected_date.month == 12:
+        last_day_of_month = datetime(
+            selected_date.year + 1, 1, 1, tzinfo=timezone) - timedelta(seconds=1)
+    else:
+        last_day_of_month = datetime(
+            selected_date.year, selected_date.month + 1, 1, tzinfo=timezone) - timedelta(seconds=1)
+
+    # total work hours
+    duration = await Staff_Shift.filter(
+        staff=staff['japanese_name'],
+        start__gte=first_day_of_month,
+        start__lte=last_day_of_month,
+    ).exclude(
+        # Excludes records with this specific service_details value
+        service_details='☆★☆お休み希望☆★☆'
+    ).filter(
+        # Further filters the already filtered & excluded set
+        service_details__in=['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']
+    ).values_list('duration', flat=True)
+
+    # Summing the total minutes
+    wh_total_minutes = sum(int(d) for d in duration if d.isdigit())
+
+    # Converting total minutes to hours
+    total_work_hours = wh_total_minutes / 60  # Use / for a floating-point result
+
+    # total night work hours
+    # work hours starts from 22:00 to 05:00
+    night_shifts = await Staff_Shift.filter(
+        staff=staff['japanese_name'],
+        start__gte=first_day_of_month,
+        start__lte=last_day_of_month,
+    ).exclude(
+        # Excludes records with this specific service_details value
+        service_details='☆★☆お休み希望☆★☆'
+    ).exclude(
+        patient__in=[
+            '安宅 哲雄', '稲葉 博之', '梅田 扶美子',
+            '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示'
+        ]
+    ).filter(
+        # Further filters the already filtered & excluded set
+        service_details__in=['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']
+    ).values_list('start', 'end')
+
+    filtered_night_shifts = []
+    for start_datetime, end_datetime in night_shifts:
+        # Extract time part for comparison
+        start_time = start_datetime.time()
+        end_time = end_datetime.time()
+
+        # Define night time window
+        night_start = time(22, 0)  # 22:00
+        night_end = time(5, 0)    # 05:00
+
+        # Check if shift falls within 22:00-05:00, accounting for midnight span
+        if start_time >= night_start or end_time <= night_end or start_time < night_end:
+            # For simplicity, we're adding the datetime objects directly but you may adjust as needed
+            filtered_night_shifts.append((start_datetime, end_datetime))
+
+    calculated_durations = calculate_night_hours(filtered_night_shifts)
+    total_night_hours = sum(shift['overlap_hours']
+                            for shift in calculated_durations)
+
+    # total holiday work hours
+    total_shifts = await Staff_Shift.filter(
+        staff=staff['japanese_name'],
+        start__gte=first_day_of_month,
+        start__lte=last_day_of_month,
+    ).exclude(
+        # Excludes records with this specific service_details value
+        service_details='☆★☆お休み希望☆★☆'
+    ).filter(
+        # Further filters the already filtered & excluded set
+        service_details__in=['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']
+    ).values_list('start', 'duration')
+
+    total_holiday_minutes = 0
+    for start, duration in total_shifts:
+        if is_holiday(start):
+            # print(start.strftime('%Y-%m-%d %H:%M:%S') +
+            #       ' is a holiday' + ' duration: ' + str(duration))
+            # Remove '分' from the duration string, convert to int
+            duration_minutes = int(duration.replace('分', ''))
+            # Add to total minutes
+            total_holiday_minutes += duration_minutes
+
+    total_holiday_hours = total_holiday_minutes / \
+        60  # Convert total minutes to hours
+
+    return {"total_hours": total_work_hours, "total_night_hours": total_night_hours, "total_holiday_hours": total_holiday_hours}
+
+
+@router.post('/all_staff_time_calculation')
+async def get_all_staff_time_calculation(selected_date: str = Form(...)):
+    # Fetch all relevant shifts in bulk, assuming `Staff_Shift` has a foreign key to `Staff`
+    # Convert selected_date string to a date range (first and last day of the month)
+    year, month = map(int, selected_date.split('-'))
+    timezone = pytz.UTC
+    first_day_of_month = datetime(year, month, 1, tzinfo=timezone)
+    last_day_of_month = datetime(year, month + 1, 1, tzinfo=timezone) - timedelta(
+        seconds=1) if month < 12 else datetime(year + 1, 1, 1, tzinfo=timezone) - timedelta(seconds=1)
+
+    # Fetch all shifts in the date range for all staff
+    shifts = await Staff_Shift.filter(
+        start__gte=first_day_of_month,
+        start__lte=last_day_of_month,
+    ).exclude(
+        service_details='☆★☆お休み希望☆★☆'
+    ).values('staff', 'patient', 'start', 'end', 'duration', 'service_details')
+    
+    # Fetch all staff with their codes and nationality
+    staff_members = await Staff.filter(disabled=False).exclude(Q(zaishoku_joukyou__icontains="退職") | Q(zaishoku_joukyou__icontains="退社済")).all().values('japanese_name', 'staff_code', 'nationality')
+
+    # Create a mapping from japanese_name to staff details
+    staff_details_mapping = {staff['japanese_name']: staff for staff in staff_members}
+
+    # Combine data
+    combined_shifts = []
+    for shift in shifts:
+        staff_detail = staff_details_mapping.get(shift['staff'])
+        if staff_detail:
+            # Add staff_code and nationality to the shift information
+            combined_shift = {
+                **shift,
+                'staff_code': staff_detail['staff_code'],
+                'nationality': staff_detail['nationality']
+            }
+            combined_shifts.append(combined_shift)
+
+
+    # Process shifts in Python to calculate metrics for each staff member
+    staff_work_hours = {}
+    staff_night_work_hours = {}
+    staff_holiday_work_hours = {}
+
+    
+    all_patients = set()
+    for shift in shifts:
+        all_patients.add(shift['patient'])
+
+    # Step 2: Process shifts and initialize staff information with all patients
+    # Initialize staff_patient_hours with all patients and special keys for every staff member
+    staff_patient_hours = {
+        staff['japanese_name']: {**{patient: 0 for patient in all_patients}, "group_home": 0, "group_home_stays": 0}
+        for staff in staff_members
+    }
+
+    for shift in combined_shifts:
+        # print(shift)
+        staff_name = shift['staff']
+        duration = int(shift['duration'].replace('分', ''))
+        patient_name = shift['patient']
+        hours = duration / 60.0  # Assuming duration is in minutes for this example
+
+        night_hours = 0
+
+        if shift['service_details'] in ['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']:
+
+            # total hours logic start
+
+            # Aggregate hours for each staff member
+            if staff_name not in staff_work_hours:
+                staff_work_hours[staff_name] = hours
+            else:
+                # means that the staff_name is in the dictionary
+                staff_work_hours[staff_name] += hours
+
+            # total hours logic end
+
+            # total night hours logic start
+            if shift["patient"] not in ['安宅 哲雄', '稲葉 博之', '梅田 扶美子', '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示']:
+                start = shift['start']
+                end = shift['end']
+                # Check if shift falls within 22:00-05:00, accounting for midnight span
+                if start.time() >= time(22, 0) or end.time() <= time(5, 0) or start.time() < time(5, 0):
+                    # calculate the night hours by this function
+                    night_hours = calculate_single_night_shift(start, end)
+
+                    # Aggregate night hours for each staff member
+                    if staff_name not in staff_night_work_hours:
+                        staff_night_work_hours[staff_name] = night_hours
+                    else:
+                        # means that the staff_name is in the dictionary
+                        staff_night_work_hours[staff_name] += night_hours
+
+            # total night hours logic
+
+            # total holiday hours logic start
+
+            if is_holiday(shift['start']):
+                if staff_name not in staff_holiday_work_hours:
+                    staff_holiday_work_hours[staff_name] = hours
+                else:
+                    # means that the staff_name is in the dictionary
+                    staff_holiday_work_hours[staff_name] += hours
+
+            # total holiday hours logic end
+
+            # total work hours per patient logic start
+
+            # Ensure staff entry exists
+            if staff_name not in staff_patient_hours:
+                staff_patient_hours[staff_name] = {
+                    "group_home": 0, "group_home_stays": 0, }
+
+            if shift["patient"] in ['安宅 哲雄', '稲葉 博之', '梅田 扶美子', '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示']:
+                staff_patient_hours[staff_name]["group_home"] += hours
+                # Increment the count only if the shift is from 6 to 11
+                if start.time() == time(6, 0):
+                    # Ensure the end time is also checked properly
+                    if end.time() >= time(6, 0) and end.time() <= time(11, 0):
+                        staff_patient_hours[staff_name]["group_home_stays"] += 1
+            else:
+                # Ensure staff entry exists
+                if staff_name not in staff_patient_hours:
+                    staff_patient_hours[staff_name] = {}
+
+                # Ensure patient entry exists for staff
+                if patient_name not in staff_patient_hours[staff_name]:
+                    staff_patient_hours[staff_name][patient_name] = 0
+
+                # Add hours to the patient for the staff
+                staff_patient_hours[staff_name][patient_name] += hours
+
+            # total work hours per patient logic end
+
+     # Initialize a list to hold the response data for each staff
+    response_list = []
+    for staff_name, patients_hours in staff_patient_hours.items():
+        staff_detail = staff_details_mapping.get(staff_name, {})
+        staff_info = {
+            "staff": staff_name,
+            "staff_code": staff_detail.get('staff_code', 'Unknown'),
+            "nationality": staff_detail.get('nationality', 'Unknown'),
+            "total_work_hours": round(staff_work_hours.get(staff_name, 0), 2),
+            "night_work_hours": round(staff_night_work_hours.get(staff_name, 0), 2),
+            "holiday_work_hours": round(staff_holiday_work_hours.get(staff_name, 0), 2),
+        }
+        staff_info.update({patient: round(hours, 2) for patient, hours in patients_hours.items()})
+
+        response_list.append(staff_info)
+
+    response_list.sort(key=lambda x: x["staff_code"])
+    return response_list
+
+
+# @router.post('/all_staff_time_calculation')
+# async def get_all_staff_time_calculation(selected_date: str = Form(...)):
+#     # Fetch all relevant shifts in bulk, assuming `Staff_Shift` has a foreign key to `Staff`
+#     # Convert selected_date string to a date range (first and last day of the month)
+#     year, month = map(int, selected_date.split('-'))
+#     timezone = pytz.UTC
+#     first_day_of_month = datetime(year, month, 1, tzinfo=timezone)
+#     last_day_of_month = datetime(year, month + 1, 1, tzinfo=timezone) - timedelta(
+#         seconds=1) if month < 12 else datetime(year + 1, 1, 1, tzinfo=timezone) - timedelta(seconds=1)
+
+#     # Fetch all shifts in the date range for all staff
+#     shifts = await Staff_Shift.filter(
+#         start__gte=first_day_of_month,
+#         start__lte=last_day_of_month,
+#     ).exclude(
+#         service_details='☆★☆お休み希望☆★☆'
+#     ).values('staff', 'patient', 'start', 'end', 'duration', 'service_details')
+    
+#     # Fetch all staff with their codes and nationality
+#     staff_members = await Staff.all().values('japanese_name', 'staff_code', 'nationality')
+
+#     # Create a mapping from japanese_name to staff details
+#     staff_details_mapping = {staff['japanese_name']: staff for staff in staff_members}
+
+#     # Combine data
+#     combined_shifts = []
+#     for shift in shifts:
+#         staff_detail = staff_details_mapping.get(shift['staff'])
+#         if staff_detail:
+#             # Add staff_code and nationality to the shift information
+#             combined_shift = {
+#                 **shift,
+#                 'staff_code': staff_detail['staff_code'],
+#                 'nationality': staff_detail['nationality']
+#             }
+#             combined_shifts.append(combined_shift)
+
+
+#     # Process shifts in Python to calculate metrics for each staff member
+#     staff_work_hours = {}
+#     staff_night_work_hours = {}
+#     staff_holiday_work_hours = {}
+
+#     # get all the patients and put in a list, use the shifts
+#     # patients_list = set(shift['patient'] for shift in shifts)
+
+#     # Use a nested dictionary to track work hours for each patient by each staff member
+#     staff_patient_hours = {}
+
+#     for shift in combined_shifts:
+#         # print(shift)
+#         staff_name = shift['staff']
+#         duration = int(shift['duration'].replace('分', ''))
+#         patient_name = shift['patient']
+#         hours = duration / 60.0  # Assuming duration is in minutes for this example
+
+#         night_hours = 0
+
+#         if shift['service_details'] in ['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']:
+
+#             # total hours logic start
+
+#             # Aggregate hours for each staff member
+#             if staff_name not in staff_work_hours:
+#                 staff_work_hours[staff_name] = hours
+#             else:
+#                 # means that the staff_name is in the dictionary
+#                 staff_work_hours[staff_name] += hours
+
+#             # total hours logic end
+
+#             # total night hours logic start
+#             if shift["patient"] not in ['安宅 哲雄', '稲葉 博之', '梅田 扶美子', '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示']:
+#                 start = shift['start']
+#                 end = shift['end']
+#                 # Check if shift falls within 22:00-05:00, accounting for midnight span
+#                 if start.time() >= time(22, 0) or end.time() <= time(5, 0) or start.time() < time(5, 0):
+#                     # calculate the night hours by this function
+#                     night_hours = calculate_single_night_shift(start, end)
+
+#                     # Aggregate night hours for each staff member
+#                     if staff_name not in staff_night_work_hours:
+#                         staff_night_work_hours[staff_name] = night_hours
+#                     else:
+#                         # means that the staff_name is in the dictionary
+#                         staff_night_work_hours[staff_name] += night_hours
+
+#             # total night hours logic
+
+#             # total holiday hours logic start
+
+#             if is_holiday(shift['start']):
+#                 if staff_name not in staff_holiday_work_hours:
+#                     staff_holiday_work_hours[staff_name] = hours
+#                 else:
+#                     # means that the staff_name is in the dictionary
+#                     staff_holiday_work_hours[staff_name] += hours
+
+#             # total holiday hours logic end
+
+#             # total work hours per patient logic start
+
+#             # Ensure staff entry exists
+#             if staff_name not in staff_patient_hours:
+#                 staff_patient_hours[staff_name] = {
+#                     "group_home": 0, "group_home_stays": 0, }
+
+#             if shift["patient"] in ['安宅 哲雄', '稲葉 博之', '梅田 扶美子', '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示']:
+#                 staff_patient_hours[staff_name]["group_home"] += hours
+#                 # Increment the count only if the shift is from 6 to 11
+#                 if start.time() == time(6, 0):
+#                     # Ensure the end time is also checked properly
+#                     if end.time() >= time(6, 0) and end.time() <= time(11, 0):
+#                         staff_patient_hours[staff_name]["group_home_stays"] += 1
+#             else:
+#                 # Ensure staff entry exists
+#                 if staff_name not in staff_patient_hours:
+#                     staff_patient_hours[staff_name] = {}
+
+#                 # Ensure patient entry exists for staff
+#                 if patient_name not in staff_patient_hours[staff_name]:
+#                     staff_patient_hours[staff_name][patient_name] = 0
+
+#                 # Add hours to the patient for the staff
+#                 staff_patient_hours[staff_name][patient_name] += hours
+
+#             # total work hours per patient logic end
+
+#      # Initialize a list to hold the response data for each staff
+#     response_list = []
+
+#     for staff_name, patients_hours in staff_patient_hours.items():
+#         staff_detail = staff_details_mapping.get(staff_name, {})
+#         staff_info = {
+#             "staff": staff_name,
+#             "staff_code": staff_detail.get('staff_code', 'Unknown'),  # Default to 'Unknown' if not found
+#             "nationality": staff_detail.get('nationality', 'Unknown'),  # Default to 'Unknown' if not found
+#             "total_work_hours": round(staff_work_hours.get(staff_name, 0), 2),
+#             "night_work_hours": round(staff_night_work_hours.get(staff_name, 0), 2),
+#             "holiday_work_hours": round(staff_holiday_work_hours.get(staff_name, 0), 2),
+            
+#         }
+
+#         # Add each patient's hours to the staff_info
+#         for patient_name, hours in patients_hours.items():
+#             staff_info[patient_name] = round(hours, 2)
+
+#         # # Add each patient's hours to the staff_info
+#         # for patient_name, hours in patients_hours.items():
+#         #     # Ensure not to override the special keys added
+#         #     if patient_name not in ["group_home", "group_home_stays"]:
+#         #         staff_info[patient_name] = round(hours, 2)
+
+#         response_list.append(staff_info)
+
+#     # Sort the list by staff name or any other attribute you prefer
+#     response_list.sort(key=lambda x: x["staff"])
+
+#     return response_list
 
 # ============================= END STAFF SHIFT HTTP ENDPOINT ============================= #
 
 # ============================= END STAFF LEAVE REQUEST HTTP ENDPOINT ============================= #
+
 
 @router.get("/leave_requests")
 async def get_all_leave_requests():

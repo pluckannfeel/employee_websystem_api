@@ -27,16 +27,24 @@ router = APIRouter(
 
 
 @router.post("/register")
-async def register_device_token(device_details_json: str = Form(...)):
-    details = json.loads(device_details_json)
+async def register_device_token(credentials_json: str = Form(...)):
+    details = json.loads(credentials_json)
+
+    print(f"details: {details}")
 
     # check if device token already exists, if not update the existing one
-    device_token = await Device_Token.get_or_none(token=details['token'])
+    device_token = await Device_Token.get_or_none(token=details['token'], staff_code=details['staff_code'])
 
     if device_token:
-        # update the existing device token
-        await device_token.update_from_dict(details)
-        await device_token.save()
+        # if the staff_code is different, create new device token
+        if device_token.staff_code != details['staff_code']:
+            device_token = await Device_Token.create(**details)
+            return await device_token_pydantic.from_tortoise_orm(device_token)
+        else:
+            # update the existing device token
+            await device_token.update_from_dict(details)
+            await device_token.save()
+
     else:
         # create a new device token
         device_token = await Device_Token.create(**details)

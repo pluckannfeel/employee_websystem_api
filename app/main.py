@@ -27,6 +27,7 @@ from app.routers.japan_addresses import router as japanAddressesRouter
 from app.routers.shift_report import router as reportRouter
 from app.routers.notifications import router as notificationRouter
 from app.routers.payslip import router as payslipRouter
+from app.routers.device_tokens import router as deviceTokenRouter
 
 # websockets
 from app.ws.connection_manager import manager as ws_manager
@@ -68,6 +69,7 @@ app.include_router(userRouter)
 app.include_router(japanAddressesRouter)
 app.include_router(notificationRouter)
 app.include_router(payslipRouter)
+app.include_router(deviceTokenRouter)
 
 # @app.websocket("/ws/notifications")
 # async def websocket_endpoint(websocket: WebSocket):
@@ -114,17 +116,20 @@ app.include_router(payslipRouter)
 
 
 origins = [
-    # '*',
+    '*',
     # "http://localhost",
     # 'http://localhost:8080',
-    'http://localhost:3000',
-    'http://localhost:3000/admin',
-    'https://mirai-cares.com',
-    'https://mirai-cares.com/admin',
-    'https://www.mirai-cares.com',
-    'https://www.mirai-cares.com/admin',
-    'https://test-deploy.d39ugbo3miv16m.amplifyapp.com/',
-    'https://test-deploy.d39ugbo3miv16m.amplifyapp.com/admin',
+    # 'http://localhost:3000',
+    # 'http://localhost:3000/admin',
+    # vite local
+    # 'http://localhost:5173'
+    # 'http://localhost:5173/admin'
+    # 'https://mirai-cares.com',
+    # 'https://mirai-cares.com/admin',
+    # 'https://www.mirai-cares.com',
+    # 'https://www.mirai-cares.com/admin',
+    # 'https://test-deploy.d39ugbo3miv16m.amplifyapp.com/',
+    # 'https://test-deploy.d39ugbo3miv16m.amplifyapp.com/admin',
 ]
 
 # middlewares

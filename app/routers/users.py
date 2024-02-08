@@ -2,6 +2,7 @@ from datetime import datetime
 import shutil
 import os
 import time
+import json
 
 from typing import List, Type
 from dotenv import load_dotenv
@@ -17,7 +18,7 @@ from app.helpers.data_checker import DataChecker as data_checker
 from tortoise.contrib.fastapi import HTTPNotFoundError
 
 # fastapi
-from fastapi import APIRouter, Depends, status, Request, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, status, Request, HTTPException, File, UploadFile, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 
@@ -300,10 +301,40 @@ async def login_user(login_info: CreateUserToken) -> dict:
 # update user info
 
 
-@router.put('/update_user_info', status_code=status.HTTP_200_OK, )
-async def update_user(user_id: str, user: UpdateUserInfo):
+# @router.put('/update_user_info', status_code=status.HTTP_200_OK, )
+# async def update_user(user_id: str, user: UpdateUserInfo):
 
-    user_data = user.dict(exclude_unset=True)
+#     user_data = user.dict(exclude_unset=True)
+
+#     # get user email from id
+#     user_email = await User.get(id=user_id).values('email')
+
+#     # check if the current user is the same as the email entered
+#     if user_data['email'] == user_email:
+#         # if user email input matched with the current user email
+#         # update User without email
+#         await User.filter(id=user_id).update(
+#             first_name=user_data['first_name'],
+#             last_name=user_data['last_name'],
+#             phone=user_data['phone'],
+#             job=user_data['job'],
+#             role=user_data['role']
+#         )
+#     else:
+#         await User.filter(id=user_id).update(**user_data)
+
+#     # get the new updated user info
+#     updated_user_info = await User.get(id=user_id).values('id', 'first_name', 'last_name', 'email', 'phone', 'job', 'role', 'created_at')
+
+#     return updated_user_info
+
+@router.put('/update_user_info', status_code=status.HTTP_200_OK, )
+async def update_user(user_json: str = Form(...)):
+    # Parse the JSON string into a dictionary
+    user_data = json.loads(user_json)
+
+    # remove id from the dictionary
+    user_id = user_data.pop('id')
 
     # get user email from id
     user_email = await User.get(id=user_id).values('email')
