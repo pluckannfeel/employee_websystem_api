@@ -28,6 +28,7 @@ from app.routers.shift_report import router as reportRouter
 from app.routers.notifications import router as notificationRouter
 from app.routers.payslip import router as payslipRouter
 from app.routers.device_tokens import router as deviceTokenRouter
+from app.routers.archive import router as archiveRouter
 
 # websockets
 from app.ws.connection_manager import manager as ws_manager
@@ -35,7 +36,7 @@ from urllib.parse import parse_qs, urlparse
 
 # auth
 from app.auth.authentication import verify_token_staff_code, verify_token_email
-
+from app.auth.lineworksapi_authtoken import LineWorksAPIJWTManager
 
 from mangum import Mangum
 
@@ -70,6 +71,9 @@ app.include_router(japanAddressesRouter)
 app.include_router(notificationRouter)
 app.include_router(payslipRouter)
 app.include_router(deviceTokenRouter)
+app.include_router(archiveRouter)
+
+lineworkjwt = LineWorksAPIJWTManager(secret_name='LineWorksAPI_SACredentials')
 
 # @app.websocket("/ws/notifications")
 # async def websocket_endpoint(websocket: WebSocket):
@@ -223,6 +227,20 @@ app.add_middleware(
 @app.get("/")
 async def main():
     return {"message": "MYS System API"}
+
+
+@app.get("/lineworksapi_data")
+def get_lineworksapi_secure_data():
+    jwt_token = lineworkjwt.get_jwt_token()
+    # secret = lineworkjwt.get_secret()
+
+    return {"token": jwt_token}
+
+    # try:
+
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=str(e))
+
 
 # aws lambda
 handler = Mangum(app)

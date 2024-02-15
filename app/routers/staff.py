@@ -1004,6 +1004,11 @@ async def get_total_work_hours():
     return {"total_hours": total_hours}
 
 
+service_details_list = ['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ', 'OFFICE事務作業']
+group_home_patients_list = ['安宅 哲雄', '稲葉 博之', '梅田 扶美子',
+                            '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示', '三浦 八千代']
+
+
 @router.post('/staff_current_records')
 async def get_staff_current_records(staff_code: str, selected_date: str):
     # this will show records of the staff that are currently working :
@@ -1045,7 +1050,7 @@ async def get_staff_current_records(staff_code: str, selected_date: str):
         service_details='☆★☆お休み希望☆★☆'
     ).filter(
         # Further filters the already filtered & excluded set
-        service_details__in=['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']
+        service_details__in=service_details_list
     ).values_list('duration', flat=True)
 
     # Summing the total minutes
@@ -1064,13 +1069,10 @@ async def get_staff_current_records(staff_code: str, selected_date: str):
         # Excludes records with this specific service_details value
         service_details='☆★☆お休み希望☆★☆'
     ).exclude(
-        patient__in=[
-            '安宅 哲雄', '稲葉 博之', '梅田 扶美子',
-            '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示'
-        ]
+        patient__in=group_home_patients_list
     ).filter(
         # Further filters the already filtered & excluded set
-        service_details__in=['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']
+        service_details__in=service_details_list
     ).values_list('start', 'end')
 
     filtered_night_shifts = []
@@ -1102,7 +1104,7 @@ async def get_staff_current_records(staff_code: str, selected_date: str):
         service_details='☆★☆お休み希望☆★☆'
     ).filter(
         # Further filters the already filtered & excluded set
-        service_details__in=['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']
+        service_details__in=service_details_list
     ).values_list('start', 'duration')
 
     total_holiday_minutes = 0
@@ -1138,12 +1140,13 @@ async def get_all_staff_time_calculation(selected_date: str = Form(...)):
     ).exclude(
         service_details='☆★☆お休み希望☆★☆'
     ).values('staff', 'patient', 'start', 'end', 'duration', 'service_details')
-    
+
     # Fetch all staff with their codes and nationality
     staff_members = await Staff.filter(disabled=False).exclude(Q(zaishoku_joukyou__icontains="退職") | Q(zaishoku_joukyou__icontains="退社済")).all().values('japanese_name', 'staff_code', 'nationality')
 
     # Create a mapping from japanese_name to staff details
-    staff_details_mapping = {staff['japanese_name']: staff for staff in staff_members}
+    staff_details_mapping = {
+        staff['japanese_name']: staff for staff in staff_members}
 
     # Combine data
     combined_shifts = []
@@ -1158,21 +1161,21 @@ async def get_all_staff_time_calculation(selected_date: str = Form(...)):
             }
             combined_shifts.append(combined_shift)
 
-
     # Process shifts in Python to calculate metrics for each staff member
     staff_work_hours = {}
     staff_night_work_hours = {}
     staff_holiday_work_hours = {}
 
-    
     all_patients = set()
     for shift in shifts:
-        all_patients.add(shift['patient'])
+        if shift["patient"] not in group_home_patients_list:
+            all_patients.add(shift['patient'])
 
     # Step 2: Process shifts and initialize staff information with all patients
     # Initialize staff_patient_hours with all patients and special keys for every staff member
     staff_patient_hours = {
-        staff['japanese_name']: {**{patient: 0 for patient in all_patients}, "group_home": 0, "group_home_stays": 0}
+        staff['japanese_name']: {
+            **{patient: 0 for patient in all_patients}, "group_home": 0, "group_home_stays": 0}
         for staff in staff_members
     }
 
@@ -1185,7 +1188,7 @@ async def get_all_staff_time_calculation(selected_date: str = Form(...)):
 
         night_hours = 0
 
-        if shift['service_details'] in ['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']:
+        if shift['service_details'] in service_details_list:
 
             # total hours logic start
 
@@ -1199,7 +1202,7 @@ async def get_all_staff_time_calculation(selected_date: str = Form(...)):
             # total hours logic end
 
             # total night hours logic start
-            if shift["patient"] not in ['安宅 哲雄', '稲葉 博之', '梅田 扶美子', '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示']:
+            if shift["patient"] not in group_home_patients_list:
                 start = shift['start']
                 end = shift['end']
                 # Check if shift falls within 22:00-05:00, accounting for midnight span
@@ -1218,7 +1221,11 @@ async def get_all_staff_time_calculation(selected_date: str = Form(...)):
 
             # total holiday hours logic start
 
-            if is_holiday(shift['start']):
+            if is_holiday(shift['start'].date()):
+                # log all shift holidays with staff パダヤオ ジャービス
+                # if shift["staff"] == "伊藤 美紀":
+                #     print(shift["start"].strftime('%Y-%m-%d %H:%M:%S') + ' is a holiday' + ' duration: ' + str(duration))
+
                 if staff_name not in staff_holiday_work_hours:
                     staff_holiday_work_hours[staff_name] = hours
                 else:
@@ -1234,13 +1241,11 @@ async def get_all_staff_time_calculation(selected_date: str = Form(...)):
                 staff_patient_hours[staff_name] = {
                     "group_home": 0, "group_home_stays": 0, }
 
-            if shift["patient"] in ['安宅 哲雄', '稲葉 博之', '梅田 扶美子', '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示']:
+            if shift["patient"] in group_home_patients_list:
                 staff_patient_hours[staff_name]["group_home"] += hours
-                # Increment the count only if the shift is from 6 to 11
-                if start.time() == time(6, 0):
-                    # Ensure the end time is also checked properly
-                    if end.time() >= time(6, 0) and end.time() <= time(11, 0):
-                        staff_patient_hours[staff_name]["group_home_stays"] += 1
+                # Increment the count only if the shift's start is 6 am
+                if shift['start'].hour == 6:
+                    staff_patient_hours[staff_name]["group_home_stays"] += 1
             else:
                 # Ensure staff entry exists
                 if staff_name not in staff_patient_hours:
@@ -1267,7 +1272,8 @@ async def get_all_staff_time_calculation(selected_date: str = Form(...)):
             "night_work_hours": round(staff_night_work_hours.get(staff_name, 0), 2),
             "holiday_work_hours": round(staff_holiday_work_hours.get(staff_name, 0), 2),
         }
-        staff_info.update({patient: round(hours, 2) for patient, hours in patients_hours.items()})
+        staff_info.update({patient: round(hours, 2)
+                          for patient, hours in patients_hours.items()})
 
         response_list.append(staff_info)
 
@@ -1275,165 +1281,97 @@ async def get_all_staff_time_calculation(selected_date: str = Form(...)):
     return response_list
 
 
-# @router.post('/all_staff_time_calculation')
-# async def get_all_staff_time_calculation(selected_date: str = Form(...)):
-#     # Fetch all relevant shifts in bulk, assuming `Staff_Shift` has a foreign key to `Staff`
-#     # Convert selected_date string to a date range (first and last day of the month)
-#     year, month = map(int, selected_date.split('-'))
-#     timezone = pytz.UTC
-#     first_day_of_month = datetime(year, month, 1, tzinfo=timezone)
-#     last_day_of_month = datetime(year, month + 1, 1, tzinfo=timezone) - timedelta(
-#         seconds=1) if month < 12 else datetime(year + 1, 1, 1, tzinfo=timezone) - timedelta(seconds=1)
+@router.post("/download_salarycalculation")
+async def download_salary_calculation(records: str = Form(...)):
+    records_data = json.loads(records)
 
-#     # Fetch all shifts in the date range for all staff
-#     shifts = await Staff_Shift.filter(
-#         start__gte=first_day_of_month,
-#         start__lte=last_day_of_month,
-#     ).exclude(
-#         service_details='☆★☆お休み希望☆★☆'
-#     ).values('staff', 'patient', 'start', 'end', 'duration', 'service_details')
-    
-#     # Fetch all staff with their codes and nationality
-#     staff_members = await Staff.all().values('japanese_name', 'staff_code', 'nationality')
+    df = pd.DataFrame(records_data)
 
-#     # Create a mapping from japanese_name to staff details
-#     staff_details_mapping = {staff['japanese_name']: staff for staff in staff_members}
+    headers = ["社員コード", "社員名", "国籍", "合計労働時間", "夜勤時間", "法定時間", "伊藤 和博", "山本 総来",
+               "鈴木 孝幸", "櫛田 美知子", "岩谷 由紀子", "里光 真紀子", "研修408", "山本 愛", "Gホーム労働時間", "Gホーム宿泊回数"]
 
-#     # Combine data
-#     combined_shifts = []
-#     for shift in shifts:
-#         staff_detail = staff_details_mapping.get(shift['staff'])
-#         if staff_detail:
-#             # Add staff_code and nationality to the shift information
-#             combined_shift = {
-#                 **shift,
-#                 'staff_code': staff_detail['staff_code'],
-#                 'nationality': staff_detail['nationality']
-#             }
-#             combined_shifts.append(combined_shift)
+    with NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
+        excel_writer = pd.ExcelWriter(tmp_file.name, engine='xlsxwriter')
+        df.to_excel(excel_writer, sheet_name='Sheet1',
+                    index=False, header=False, startrow=1)
 
+        workbook = excel_writer.book
+        worksheet = excel_writer.sheets['Sheet1']
 
-#     # Process shifts in Python to calculate metrics for each staff member
-#     staff_work_hours = {}
-#     staff_night_work_hours = {}
-#     staff_holiday_work_hours = {}
+        # Define formats
+        format_black_bg_white_font = workbook.add_format(
+            {'bg_color': '#000000', 'font_color': '#FFFFFF', 'font_size': 14, "border": 1})
+        format_pale_yellow_bg_black_font = workbook.add_format(
+            {'bg_color': '#FFFF99', 'font_color': '#000000', 'font_size': 14, "border": 1})
+        format_baby_blue_bg_black_font = workbook.add_format(
+            {'bg_color': '#CCEFFF', 'font_color': '#000000', 'font_size': 14, "border": 1})
+        format_pale_orange_bg_black_font = workbook.add_format(
+            {'bg_color': '#FFCC99', 'font_color': '#000000', 'font_size': 14, "border": 1})
+        format_pale_blue_bg_black_font = workbook.add_format(
+            {'bg_color': '#D0E4F5', 'font_color': '#000000', 'font_size': 14, "border": 1})
+        format_pale_white_bg_black_font = workbook.add_format(
+            {'bg_color': '#F8F8F8', 'font_color': '#000000', 'font_size': 14, "border": 1})
 
-#     # get all the patients and put in a list, use the shifts
-#     # patients_list = set(shift['patient'] for shift in shifts)
+        # Apply formatting to headers and all rows for specific columns
+        column_formats = {
+            0: format_black_bg_white_font,    # "社員コード"
+            1: format_pale_yellow_bg_black_font,  # "社員名"
+            2: format_baby_blue_bg_black_font,    # "国籍"
+            3: format_pale_orange_bg_black_font,  # "合計労働時間"
+            4: format_pale_orange_bg_black_font,  # "夜勤時間"
+            # Map other columns as needed
+            # get the last two column
+            5: format_pale_white_bg_black_font,
+            6: format_pale_white_bg_black_font,
+            7: format_pale_white_bg_black_font,
+            8: format_pale_white_bg_black_font,
+            9: format_pale_white_bg_black_font,
+            10: format_pale_white_bg_black_font,
+            11: format_pale_white_bg_black_font,
+            12: format_pale_white_bg_black_font,
+            13: format_pale_white_bg_black_font,
+            14: format_pale_blue_bg_black_font,
+            15: format_pale_blue_bg_black_font
+        }
 
-#     # Use a nested dictionary to track work hours for each patient by each staff member
-#     staff_patient_hours = {}
+        # Write headers with formatting
+        for col_num, header in enumerate(headers):
+            worksheet.write(0, col_num, header,
+                            column_formats.get(col_num, None))
 
-#     for shift in combined_shifts:
-#         # print(shift)
-#         staff_name = shift['staff']
-#         duration = int(shift['duration'].replace('分', ''))
-#         patient_name = shift['patient']
-#         hours = duration / 60.0  # Assuming duration is in minutes for this example
+        # Apply formats to all rows in specified columns
+        for col_num, col_format in column_formats.items():
+            if col_format:
+                # +1 because row indexing starts at 1 and we skip header row
+                for row_num in range(1, len(df) + 1):
+                    worksheet.write(row_num, col_num,
+                                    df.iloc[row_num - 1, col_num], col_format)
 
-#         night_hours = 0
+        # Adjust column widths based on content
+        for col_num, header in enumerate(headers):
+            max_len = max(df.iloc[:, col_num].astype(
+                str).str.len().max(), len(header))
+            # Adjust for padding
+            worksheet.set_column(col_num, col_num, max_len + 5)
 
-#         if shift['service_details'] in ['重訪Ⅰ', '重訪Ⅱ', '重訪Ⅲ']:
+            # if header is  社員名 make padding to 12
+            if col_num == 0:
+                worksheet.set_column(col_num, col_num, max_len + 20)
 
-#             # total hours logic start
+            if col_num == 2:
+                worksheet.set_column(col_num, col_num, max_len + 8)
 
-#             # Aggregate hours for each staff member
-#             if staff_name not in staff_work_hours:
-#                 staff_work_hours[staff_name] = hours
-#             else:
-#                 # means that the staff_name is in the dictionary
-#                 staff_work_hours[staff_name] += hours
+        excel_writer.close()
 
-#             # total hours logic end
+    response = FileResponse(
+        tmp_file.name,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="salarycalculation.xlsx"
+    )
+    # Cleanup: Remove the temporary file after sending the response
+    # os.unlink(tmp_file.name)
+    return response
 
-#             # total night hours logic start
-#             if shift["patient"] not in ['安宅 哲雄', '稲葉 博之', '梅田 扶美子', '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示']:
-#                 start = shift['start']
-#                 end = shift['end']
-#                 # Check if shift falls within 22:00-05:00, accounting for midnight span
-#                 if start.time() >= time(22, 0) or end.time() <= time(5, 0) or start.time() < time(5, 0):
-#                     # calculate the night hours by this function
-#                     night_hours = calculate_single_night_shift(start, end)
-
-#                     # Aggregate night hours for each staff member
-#                     if staff_name not in staff_night_work_hours:
-#                         staff_night_work_hours[staff_name] = night_hours
-#                     else:
-#                         # means that the staff_name is in the dictionary
-#                         staff_night_work_hours[staff_name] += night_hours
-
-#             # total night hours logic
-
-#             # total holiday hours logic start
-
-#             if is_holiday(shift['start']):
-#                 if staff_name not in staff_holiday_work_hours:
-#                     staff_holiday_work_hours[staff_name] = hours
-#                 else:
-#                     # means that the staff_name is in the dictionary
-#                     staff_holiday_work_hours[staff_name] += hours
-
-#             # total holiday hours logic end
-
-#             # total work hours per patient logic start
-
-#             # Ensure staff entry exists
-#             if staff_name not in staff_patient_hours:
-#                 staff_patient_hours[staff_name] = {
-#                     "group_home": 0, "group_home_stays": 0, }
-
-#             if shift["patient"] in ['安宅 哲雄', '稲葉 博之', '梅田 扶美子', '堺 宗太郎', '仙波 義弘', '安田 恵子', '岩崎 裕示']:
-#                 staff_patient_hours[staff_name]["group_home"] += hours
-#                 # Increment the count only if the shift is from 6 to 11
-#                 if start.time() == time(6, 0):
-#                     # Ensure the end time is also checked properly
-#                     if end.time() >= time(6, 0) and end.time() <= time(11, 0):
-#                         staff_patient_hours[staff_name]["group_home_stays"] += 1
-#             else:
-#                 # Ensure staff entry exists
-#                 if staff_name not in staff_patient_hours:
-#                     staff_patient_hours[staff_name] = {}
-
-#                 # Ensure patient entry exists for staff
-#                 if patient_name not in staff_patient_hours[staff_name]:
-#                     staff_patient_hours[staff_name][patient_name] = 0
-
-#                 # Add hours to the patient for the staff
-#                 staff_patient_hours[staff_name][patient_name] += hours
-
-#             # total work hours per patient logic end
-
-#      # Initialize a list to hold the response data for each staff
-#     response_list = []
-
-#     for staff_name, patients_hours in staff_patient_hours.items():
-#         staff_detail = staff_details_mapping.get(staff_name, {})
-#         staff_info = {
-#             "staff": staff_name,
-#             "staff_code": staff_detail.get('staff_code', 'Unknown'),  # Default to 'Unknown' if not found
-#             "nationality": staff_detail.get('nationality', 'Unknown'),  # Default to 'Unknown' if not found
-#             "total_work_hours": round(staff_work_hours.get(staff_name, 0), 2),
-#             "night_work_hours": round(staff_night_work_hours.get(staff_name, 0), 2),
-#             "holiday_work_hours": round(staff_holiday_work_hours.get(staff_name, 0), 2),
-            
-#         }
-
-#         # Add each patient's hours to the staff_info
-#         for patient_name, hours in patients_hours.items():
-#             staff_info[patient_name] = round(hours, 2)
-
-#         # # Add each patient's hours to the staff_info
-#         # for patient_name, hours in patients_hours.items():
-#         #     # Ensure not to override the special keys added
-#         #     if patient_name not in ["group_home", "group_home_stays"]:
-#         #         staff_info[patient_name] = round(hours, 2)
-
-#         response_list.append(staff_info)
-
-#     # Sort the list by staff name or any other attribute you prefer
-#     response_list.sort(key=lambda x: x["staff"])
-
-#     return response_list
 
 # ============================= END STAFF SHIFT HTTP ENDPOINT ============================= #
 

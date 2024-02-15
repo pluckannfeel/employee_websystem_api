@@ -82,34 +82,34 @@ def calculate_night_hours(shifts):
     return results
 
 
-japan_holidays = [
-    # Fixed holidays
-    "2024-01-01",  # New Year's Day
-    "2024-01-02",
-    "2024-01-03",
-    "2024-01-10",  # Coming of Age Day (Second Monday of January)
-    "2024-02-11",  # National Foundation Day
-    "2024-02-23",  # The Emperor's Birthday
-    "2024-03-20",  # Vernal Equinox Day
-    "2024-04-29",  # Showa Day
-    "2024-05-03",  # Constitution Memorial Day
-    "2024-05-04",  # Greenery Day
-    "2024-05-05",  # Children's Day
-    "2024-07-15",  # Marine Day (Third Monday of July)
-    "2024-08-11",  # Mountain Day
-    "2024-09-16",  # Respect for the Aged Day (Third Monday of September)
-    "2024-09-23",  # Autumnal Equinox Day
-    "2024-10-14",  # Health and Sports Day (Second Monday of October)
-    "2024-11-03",  # Culture Day
-    "2024-11-23",  # Labour Thanksgiving Day
-    # Specific dates you mentioned
-    "2024-12-29",
-    "2024-12-30",
-    "2024-12-31",
-    "2024-08-13",
-    "2024-08-14",
-    "2024-08-15"
-]
+# japan_holidays = [
+#     # Fixed holidays
+#     "2024-01-01",  # New Year's Day
+#     "2024-01-02",
+#     "2024-01-03",
+#     "2024-01-10",  # Coming of Age Day (Second Monday of January)
+#     "2024-02-11",  # National Foundation Day
+#     "2024-02-23",  # The Emperor's Birthday
+#     "2024-03-20",  # Vernal Equinox Day
+#     "2024-04-29",  # Showa Day
+#     "2024-05-03",  # Constitution Memorial Day
+#     "2024-05-04",  # Greenery Day
+#     "2024-05-05",  # Children's Day
+#     "2024-07-15",  # Marine Day (Third Monday of July)
+#     "2024-08-11",  # Mountain Day
+#     "2024-09-16",  # Respect for the Aged Day (Third Monday of September)
+#     "2024-09-23",  # Autumnal Equinox Day
+#     "2024-10-14",  # Health and Sports Day (Second Monday of October)
+#     "2024-11-03",  # Culture Day
+#     "2024-11-23",  # Labour Thanksgiving Day
+#     # Specific dates you mentioned
+#     "2024-12-29",
+#     "2024-12-30",
+#     "2024-12-31",
+#     "2024-08-13",
+#     "2024-08-14",
+#     "2024-08-15"
+# ]
 
 
 def get_movable_holiday(year):
@@ -122,6 +122,9 @@ def get_movable_holiday(year):
         year, 1, 1) + timedelta(days=(7 - datetime(year, 1, 1).weekday() + 7) % 7 + 7)
     # Format the date as string since the rest of the code expects string format
     coming_of_age_day_str = coming_of_age_day.strftime('%Y-%m-%d')
+
+    # print(coming_of_age_day_str)
+
     return [coming_of_age_day_str]
     # Add similar calculations for other movable holidays
 
@@ -167,5 +170,8 @@ def is_holiday(date):
 
     # Format the date to string to check in the list
     date_str = date.strftime('%Y-%m-%d')
+
+    #print all the list of holidays
+    # print(all_holidays)
 
     return date_str in all_holidays
