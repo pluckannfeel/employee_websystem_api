@@ -37,6 +37,36 @@ async def get_current_directory(folder_path: str):
     return files
 
 
+@router.post("/upload_file")
+async def upload_file(file: UploadFile = File(...), current_path: str = Form(...)):
+    try:
+
+        # print(current_path)
+        # print(file.filename)
+        file_name = file.filename
+        # # upload the file
+        uploadFile = archive_manager.upload_file(file, file_name, current_path)
+
+        return uploadFile
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/replace_file")
+async def replace_file(file: UploadFile = File(...), current_path: str = Form(...)):
+    try:
+        file_name = file.filename
+        # # upload the file
+        uploadFile = archive_manager.replace_file(
+            file, file_name, current_path)
+
+        return uploadFile
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/create_folder")
 async def create_folder(folder_name: str = Form(...), current_path: str = Form(...)):
     # Assuming you have logic here to create the folder...

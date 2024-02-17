@@ -127,7 +127,7 @@ class ArchiveManager():
 
     def upload_file(self, file_object, file_name, folder_path):
         """Upload a file to a specified folder within the bucket, checking if the file already exists."""
-        object_name = f'{folder_path}/{file_name}' if folder_path else file_name
+        object_name = f'{folder_path}{file_name}' if folder_path else file_name
         if self.file_exists(object_name):
             print(f"File {object_name} already exists")
             return {"code": "fileExists", "message": "File already exists"}
@@ -151,7 +151,7 @@ class ArchiveManager():
 
     def replace_file(self, file_object, file_name, folder_path=''):
         """Replace and existing file in a specified folder within the bucket."""
-        object_name = f'{folder_path}/{file_name}' if folder_path else file_name
+        object_name = f'{folder_path}{file_name}' if folder_path else file_name
 
         temp = NamedTemporaryFile(delete=False)
         try:
