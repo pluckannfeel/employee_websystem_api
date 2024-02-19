@@ -6,6 +6,9 @@ import pandas as pd
 from typing import List, Type
 from app.helpers.s3_file_upload import generate_s3_url, upload_file_to_s3
 
+# schema
+from app.models.archive_schema import FilesToDelete
+
 # fast api
 from fastapi import APIRouter, status, HTTPException, File, Form, UploadFile, Response
 from fastapi.responses import JSONResponse, FileResponse
@@ -38,14 +41,15 @@ async def get_current_directory(folder_path: str):
 
 
 @router.post("/upload_file")
-async def upload_file(file: UploadFile = File(...), current_path: str = Form(...)):
+async def upload_file(file: UploadFile = File(...), current_path: str = Form(...), user_name: str = Form(...)):
     try:
 
         # print(current_path)
         # print(file.filename)
         file_name = file.filename
         # # upload the file
-        uploadFile = archive_manager.upload_file(file, file_name, current_path)
+        uploadFile = archive_manager.upload_file(
+            file, file_name, current_path, last_modified_by=user_name)
 
         return uploadFile
 
@@ -54,12 +58,12 @@ async def upload_file(file: UploadFile = File(...), current_path: str = Form(...
 
 
 @router.post("/replace_file")
-async def replace_file(file: UploadFile = File(...), current_path: str = Form(...)):
+async def replace_file(file: UploadFile = File(...), current_path: str = Form(...), user_name: str = Form(...)):
     try:
         file_name = file.filename
         # # upload the file
         uploadFile = archive_manager.replace_file(
-            file, file_name, current_path)
+            file, file_name, current_path, last_modified_by=user_name)
 
         return uploadFile
 
@@ -68,11 +72,12 @@ async def replace_file(file: UploadFile = File(...), current_path: str = Form(..
 
 
 @router.post("/create_folder")
-async def create_folder(folder_name: str = Form(...), current_path: str = Form(...)):
+async def create_folder(folder_name: str = Form(...), current_path: str = Form(...), user_name: str = Form(...)):
     # Assuming you have logic here to create the folder...
     try:
         # Your logic to create the folder
-        createFolder = archive_manager.create_folder(folder_name, current_path)
+        createFolder = archive_manager.create_folder(
+            folder_name, current_path, last_modified_by=user_name)
 
         return createFolder
 
@@ -85,5 +90,17 @@ async def create_folder(folder_name: str = Form(...), current_path: str = Form(.
         #     # raise error
         #     raise HTTPException(
         #         status_code=400, detail=createFolder.get('message'))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/delete_files")
+async def delete_files(files_to_delete: FilesToDelete):
+    try:
+        # Your logic to create the folder
+        deleteFiles = archive_manager.delete_files(files_to_delete.files)
+
+        return deleteFiles
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
