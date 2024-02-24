@@ -43,3 +43,6 @@ patient_pydantic = pydantic_model_creator(
     Patient, name='Patient', exclude=('created_at'))
 patientSelect_pydantic = pydantic_model_creator(Patient, name='PatientSelect', include=(
     'id', 'name_kanji', 'name_kana', 'birth_date', 'prefecture', 'municipality',  'town', 'building', 'postal_code', 'disable_support_category'))
+
+PatientBirthdays_pydantic = pydantic_model_creator(Patient, name='PatientBirthdays', include=(
+    'id', 'name_kanji', 'name_kana', 'birth_date'))

@@ -7,7 +7,7 @@ from typing import List, Type
 from app.helpers.s3_file_upload import generate_s3_url, upload_file_to_s3
 
 # schema
-from app.models.archive_schema import FilesToDelete
+from app.models.archive_schema import FilesToDelete, FilesToDownload
 
 # fast api
 from fastapi import APIRouter, status, HTTPException, File, Form, UploadFile, Response
@@ -52,6 +52,18 @@ async def upload_file(file: UploadFile = File(...), current_path: str = Form(...
             file, file_name, current_path, last_modified_by=user_name)
 
         return uploadFile
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/download_files", response_model=str)
+async def download_files(files_to_download: FilesToDownload):
+    try:
+        # Logic to download the specified files and folders, returning a presigned URL for the ZIP file
+        presigned_url = archive_manager.download_files(files_to_download.files)
+        # return {"url": presigned_url}
+        return presigned_url
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

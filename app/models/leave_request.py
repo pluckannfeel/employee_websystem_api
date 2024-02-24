@@ -8,6 +8,7 @@ class Leave_Request(Model):
     staff = fields.ForeignKeyField(
         'models.Staff', related_name='staff_leave_request', on_delete='CASCADE')
     leave_type = fields.CharField(max_length=128, null=True)
+    number_of_days = fields.IntField(null=True)
     start_date = fields.DateField(null=True)
     end_date = fields.DateField(null=True)
     details = fields.TextField(null=True)

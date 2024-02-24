@@ -21,7 +21,8 @@ from fastapi.responses import JSONResponse, FileResponse
 
 # models
 from app.models.user import User
-from app.models.staff import Staff, staff_pydantic, staffSelect_pydantic
+from app.models.staff import Staff, staff_pydantic, staffSelect_pydantic, staffBirthdays_pydantic
+from app.models.patient import Patient, PatientBirthdays_pydantic
 from app.models.staff_shift import Staff_Shift, staff_shift_pydantic
 from app.models.leave_request import Leave_Request, leave_request_pydantic
 
@@ -1381,7 +1382,7 @@ async def download_salary_calculation(records: str = Form(...)):
 @router.get("/leave_requests")
 async def get_all_leave_requests():
     raw_requests = await Leave_Request.all().prefetch_related('staff').values(
-        "id", "start_date", "end_date", "details", "status", "created_at",
+        "id", "start_date", "end_date", "leave_type", "number_of_days", "details", "status", "created_at",
         "staff__english_name", "staff__japanese_name", "staff__staff_code"
     )
 
@@ -1391,6 +1392,8 @@ async def get_all_leave_requests():
             "id": req["id"],
             "start_date": req["start_date"],
             "end_date": req["end_date"],
+            "leave_type": req["leave_type"],
+            "number_of_days": req["number_of_days"],
             "details": req["details"],
             "status": req["status"],
             "created_at": req["created_at"],
@@ -1522,3 +1525,33 @@ async def delete_staff_leave_request(id: str):
     # await create_and_broadcast_notification("deleteLeaveRequest", json.dumps(notification))
 
     return id
+
+
+# ============================= END STAFF LEAVE REQUEST HTTP ENDPOINT ============================= #
+
+# get all staff birthdays
+@router.get("/birthdays")
+async def get_birthdays():
+    staff_birthdays = Staff.filter(disabled=False).exclude(Q(zaishoku_joukyou__icontains="退職") | Q(
+        zaishoku_joukyou__icontains="退社済")).order_by("birth_date").all()
+    # Add your own filter here
+    patient_birthdays = Patient.filter(data_disabled=False).order_by("birth_date").all()
+
+    staff_list = await staffBirthdays_pydantic.from_queryset(staff_birthdays)
+    patient_list = await PatientBirthdays_pydantic.from_queryset(patient_birthdays)
+
+    # Transform patient_list to match the structure of staff_list
+    normalized_patient_list = [
+        {
+            "id": patient.id,
+            "staff_code": None,  # Assuming patients don't have a staff_code
+            # Assuming name_kana is the 'english' name equivalent
+            "english_name": patient.name_kana,
+            "japanese_name": patient.name_kanji,
+            "birth_date": patient.birth_date
+        }
+        for patient in patient_list
+    ]
+
+    combined_list = staff_list + normalized_patient_list
+    return combined_list

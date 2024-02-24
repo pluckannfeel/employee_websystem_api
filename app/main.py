@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Request, 
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 import requests
+import smtplib
 import json
 
 # cors headers
@@ -15,7 +16,8 @@ from app.helpers.datetime import get_date_time_now
 # database
 from app.db.init import initialize_db
 
-# routers
+# pydantic
+
 # routers
 from app.routers.users import router as userRouter
 from app.routers.employees import router as employeeRouter
@@ -29,6 +31,7 @@ from app.routers.notifications import router as notificationRouter
 from app.routers.payslip import router as payslipRouter
 from app.routers.device_tokens import router as deviceTokenRouter
 from app.routers.archive import router as archiveRouter
+from app.routers.shift_attendance import router as shiftAttendanceRouter
 
 # websockets
 from app.ws.connection_manager import manager as ws_manager
@@ -39,6 +42,9 @@ from app.auth.authentication import verify_token_staff_code, verify_token_email
 from app.auth.lineworksapi_authtoken import LineWorksAPIJWTManager
 
 from mangum import Mangum
+
+# line works mail
+from app.helpers.send_mail import Mailer, EmailSchema
 
 # onedrive
 from app.helpers.onedrive import get_access_token
@@ -72,8 +78,10 @@ app.include_router(notificationRouter)
 app.include_router(payslipRouter)
 app.include_router(deviceTokenRouter)
 app.include_router(archiveRouter)
+app.include_router(shiftAttendanceRouter)
 
 lineworkjwt = LineWorksAPIJWTManager(secret_name='LineWorksAPI_SACredentials')
+
 
 # @app.websocket("/ws/notifications")
 # async def websocket_endpoint(websocket: WebSocket):
@@ -227,6 +235,38 @@ app.add_middleware(
 @app.get("/")
 async def main():
     return {"message": "MYS System API"}
+
+
+@app.get("/test")
+def test_smtp_login(server, port, username, password):
+    try:
+        with smtplib.SMTP(server, port) as smtp:
+            smtp.starttls()  # Comment this out if using SSL (port 465)
+            smtp.login(username, password)
+            print("SMTP authentication successful.")
+    except smtplib.SMTPAuthenticationError:
+        print("SMTP authentication failed. Check username and password.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
+@app.get("/send_mail")
+async def send_mail(recipient_email: str, subject: str, body: str):
+    try:
+
+        mailer = Mailer()
+
+        await mailer.send_email(EmailSchema(
+            email=["millanjarvis421@gmail.com"],
+            body="This is a test email",
+            subject="Test email")
+        )
+
+        # await mailer.send_email(recipient_email, subject, body)
+
+        return {"message": "email has been sent"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/lineworksapi_data")

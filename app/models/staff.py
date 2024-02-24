@@ -63,3 +63,6 @@ staff_pydantic = pydantic_model_creator(
 # create a pydantic that only takes id, english_name, japanese_name, staff_group, duty_type
 staffSelect_pydantic = pydantic_model_creator(Staff, name='StaffSelect', include=(
     'id', 'personal_email', 'work_email', 'staff_code', 'english_name', 'japanese_name', 'affiliation', 'prefecture', 'municipality', 'town', 'building', 'postal_code', 'duty_type', 'birth_date', 'gender'))
+
+staffBirthdays_pydantic = pydantic_model_creator(Staff, name='StaffBirthdays', include=(
+    'id', 'staff_code', 'english_name', 'japanese_name', 'birth_date'))

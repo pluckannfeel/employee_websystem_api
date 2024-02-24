@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import zipfile
 from botocore.exceptions import ClientError
 from tempfile import NamedTemporaryFile, TemporaryDirectory
+import urllib.parse
 
 load_dotenv()
 
@@ -37,10 +38,12 @@ class ArchiveManager():
                                 Bucket=self.bucket_name,
                                 Key=file_key
                             )
-                            last_modified_by = metadata_response.get(
-                                'Metadata', {}).get('last_modified_by', 'unknown')
+                            # Decode the URL-encoded 'last_modified_by' metadata
+                            last_modified_by = urllib.parse.unquote(metadata_response.get(
+                                'Metadata', {}).get('last_modified_by', 'unknown'))
                         except ClientError as e:
-                            print(f"Could not fetch metadata for {file_key}: {e}")
+                            print(
+                                f"Could not fetch metadata for {file_key}: {e}")
                             last_modified_by = "unknown"
 
                         file_type = self.get_file_type(file_name)
@@ -51,7 +54,8 @@ class ArchiveManager():
                             "type": file_type,
                             "lastModified": content.get('LastModified').strftime('%Y-%m-%d %H:%M') if content.get('LastModified') else '',
                             "eTag": content.get('ETag', ''),
-                            "createdBy": last_modified_by,  # Using last_modified_by which defaults to "system" if not present
+                            # Using last_modified_by which defaults to "system" if not present
+                            "createdBy": last_modified_by,
                             "lastModifiedBy": last_modified_by
                         })
 
@@ -79,9 +83,9 @@ class ArchiveManager():
             }
 
         except ClientError as e:
-            print(f"An error occurred reading {self.bucket_name} root directory: {e}")
+            print(
+                f"An error occurred reading {self.bucket_name} root directory: {e}")
             raise e
-
 
     def get_file_type(self, file_name):
         # Mapping extensions to a human-readable file type
@@ -144,6 +148,9 @@ class ArchiveManager():
             print(f"File {object_name} already exists")
             return {"code": "fileExists", "message": "File already exists"}
 
+        # URL-encode the last_modified_by metadata to ensure ASCII compliance
+        encoded_last_modified_by = urllib.parse.quote(last_modified_by)
+
         # else, continue uploading
         temp = NamedTemporaryFile(delete=False)
         try:
@@ -151,7 +158,7 @@ class ArchiveManager():
             with open(temp.name, 'wb') as f:
                 f.write(contents)
             self.client.upload_file(temp.name, self.bucket_name, object_name, ExtraArgs={
-                                    "ACL": 'public-read', "ContentType": file_object.content_type, "Metadata": {"last_modified_by": last_modified_by}})
+                                    "ACL": 'public-read', "ContentType": file_object.content_type, "Metadata": {"last_modified_by": encoded_last_modified_by}})
 
             return {"code": "success", "message": "File uploaded successfully"}
         except ClientError as e:
@@ -165,13 +172,16 @@ class ArchiveManager():
         """Replace and existing file in a specified folder within the bucket."""
         object_name = f'{folder_path}{file_name}' if folder_path else file_name
 
+        # URL-encode the last_modified_by metadata to ensure ASCII compliance
+        encoded_last_modified_by = urllib.parse.quote(last_modified_by)
+
         temp = NamedTemporaryFile(delete=False)
         try:
             contents = file_object.file.read()
             with open(temp.name, 'wb') as f:
                 f.write(contents)
             self.client.upload_file(temp.name, self.bucket_name, object_name, ExtraArgs={
-                                    "ACL": 'public-read', "ContentType": file_object.content_type, "Metadata": {"last_modified_by": last_modified_by}})
+                                    "ACL": 'public-read', "ContentType": file_object.content_type, "Metadata": {"last_modified_by": encoded_last_modified_by}})
 
             return {"code": "success", "message": "File uploaded successfully"}
         except:
@@ -197,62 +207,71 @@ class ArchiveManager():
             print(f"Folder '{full_folder_path}' already exists in the bucket.")
             return {"code": "folderExists", "message": "Folder already exists"}
 
+        # URL-encode the last_modified_by metadata to ensure ASCII compliance
+        encoded_last_modified_by = urllib.parse.quote(last_modified_by)
+
         try:
             self.client.put_object(
                 Bucket=self.bucket_name,
                 Key=full_folder_path,
-                Metadata={'last_modified_by': last_modified_by}
+                Metadata={'last_modified_by': encoded_last_modified_by}
             )
-            return {"code": "success", "message": f"Folder '{folder_name}' created successfully, last modified by {last_modified_by}"}
+            return {"code": "success", "message": f"Folder '{folder_name}' created successfully, last modified by {encoded_last_modified_by}"}
         except ClientError as e:
             print(f"An error occurred creating the folder: {e}")
             return {"code": "error", "message": f"There was an error creating the folder: {e}"}
 
     def download_files(self, keys):
         """
-        Creates a ZIP archive of the specified files and returns a presigned URL for downloading the archive.
-
-        :param keys: A list of keys representing the files to include in the download.
+        Downloads files and folders, preserving the directory structure in the ZIP file.
         """
-        # Create a temporary directory to store the files
         with TemporaryDirectory() as temp_dir:
-            zip_path = os.path.join(temp_dir, "archive.zip")
-
-            # Create a ZIP file
-            with zipfile.ZipFile(zip_path, 'w') as zipf:
+            zip_file_path = os.path.join(temp_dir, 'archive.zip')
+            with zipfile.ZipFile(zip_file_path, 'w') as zipf:
                 for key in keys:
-                    # Attempt to download each file
-                    try:
-                        file_path = os.path.join(
-                            temp_dir, os.path.basename(key))
-                        self.client.download_file(
-                            self.bucket_name, key, file_path)
-                        zipf.write(file_path, arcname=os.path.basename(key))
-                    except ClientError as e:
-                        print(f"Error downloading file {key}: {e}")
-                        continue  # Skip files that couldn't be downloaded
+                    if key.endswith('/'):
+                        self._download_folder_contents(key, zipf, temp_dir, os.path.basename(key.rstrip('/')))
+                    else:
+                        self._download_file(key, zipf, temp_dir)
 
-            # Generate a presigned URL for the ZIP file
-            return self.upload_temporary_file(zip_path, "download.zip")
+            # Upload the ZIP file to S3 for temporary access and generate a presigned URL
+            zip_object_name = 'temp/' + os.path.basename(zip_file_path)
+            self.client.upload_file(zip_file_path, self.bucket_name, zip_object_name)
+            presigned_url = self.client.generate_presigned_url('get_object',
+                                                               Params={'Bucket': self.bucket_name, 'Key': zip_object_name},
+                                                               ExpiresIn=3600)
+            return presigned_url
 
-    def upload_temporary_file(self, file_path, s3_key):
+    def _download_folder_contents(self, prefix, zipf, temp_dir, folder_name=''):
         """
-        Uploads a temporary file to S3 and generates a presigned URL for accessing it.
-
-        :param file_path: Path to the local file to upload.
-        :param s3_key: S3 key under which to store the file.
+        Recursively downloads the contents of a folder.
         """
+        paginator = self.client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                file_key = obj['Key']
+                if not file_key.endswith('/'):
+                    file_path = os.path.join(temp_dir, file_key[len(prefix):])
+                    self.client.download_file(self.bucket_name, file_key, file_path)
+                    zipf.write(file_path, arcname=os.path.join(folder_name, os.path.basename(file_path)))
+
+    def _download_file(self, key, zipf, temp_dir):
+        """
+        Downloads a single file.
+        """
+        file_path = os.path.join(temp_dir, os.path.basename(key))
+        self.client.download_file(self.bucket_name, key, file_path)
+        zipf.write(file_path, arcname=os.path.basename(file_path))
+
+    def _generate_presigned_url(self, zip_path, file_key='download.zip', expiration=3600):
         try:
-            # Upload the ZIP file to S3
-            self.client.upload_file(file_path, self.bucket_name, s3_key, ExtraArgs={
-                                    "ContentType": "application/zip"})
-            # Generate a presigned URL for the ZIP file
+            self.client.upload_file(zip_path, 'your_bucket_name', file_key)
             url = self.client.generate_presigned_url('get_object', Params={
-                                                     'Bucket': self.bucket_name, 'Key': s3_key}, ExpiresIn=3600)  # URL expires in 1 hour
-            return {"url": url}
+                                                     'Bucket': 'your_bucket_name', 'Key': file_key}, ExpiresIn=expiration)
+            return url
         except ClientError as e:
-            print(f"Error uploading temporary file: {e}")
-            return {"error": "Failed to generate download URL"}
+            print(f"Failed to generate presigned URL: {e}")
+            return None
 
     def delete_files(self, keys):
         """
